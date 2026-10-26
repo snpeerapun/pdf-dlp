@@ -69,6 +69,15 @@ ClassifyPanel::ClassifyPanel(QWidget* parent) : QScrollArea(parent) {
     });
     list->setContextMenuPolicy(Qt::CustomContextMenu);
     setDocument(nullptr);
+    // auto-detect labels from the Microsoft DLP / Purview caches on this machine at startup (silent, in the background)
+    QTimer::singleShot(800, this, [this]() {
+        Core::async([]() { return Core::discoverLabels(); }, [this](QJsonObject r) {
+            const QJsonArray found = r.value("labels").toArray(); if (!found.isEmpty()) mergeLabels(found);
+            QStringList n; n << QString("%1 · %2: %3").arg(TXT("autoDetected")).arg(TXT("found")).arg(found.size()); for (const auto& x : r.value("notes").toArray()) n << x.toString();
+            if (m_labels.isEmpty()) n << TXT("noLabels");
+            notes->setText(n.join("\n"));
+        });
+    });
 }
 void ClassifyPanel::retranslate() {
     gCur->setTitle(TXT("currentLabel")); gChoose->setTitle(TXT("chooseLabel")); gMark->setTitle(TXT("marking")); removeBtn->setText(TXT("removeLabel")); readWinBtn->setText(TXT("readFromWindows")); learnBtn->setText(TXT("learnFromFile")); addBtn->setText(TXT("addManual"));
