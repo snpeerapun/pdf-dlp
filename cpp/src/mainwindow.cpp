@@ -19,22 +19,25 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     modifiedBadge = new QLabel; modifiedBadge->setObjectName("badgeWarn"); modifiedBadge->hide(); tb->addWidget(modifiedBadge);
     busyLbl = new QLabel; busyLbl->setObjectName("badgeInfo"); busyLbl->hide(); tb->addWidget(busyLbl);
     auto* sp = new QWidget; sp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); tb->addWidget(sp);
-    auto* leftTog = tb->addAction(FA::icon(FA::Columns, QColor("#6f7a89")), ""); leftTog->setCheckable(true); leftTog->setChecked(true); leftTog->setToolTip("⌘1");
-    connect(leftTog, &QAction::toggled, this, [this](bool on) { if (leftDock) leftDock->setVisible(on); });
-    prevAct = tb->addAction(FA::icon(FA::ChevronUp, QColor("#6f7a89")), ""); pageEdit = new QLineEdit; pageEdit->setFixedWidth(46); pageEdit->setAlignment(Qt::AlignCenter); tb->addWidget(pageEdit); pageTotal = new QLabel(" / 0 "); tb->addWidget(pageTotal); nextAct = tb->addAction(FA::icon(FA::ChevronDown, QColor("#6f7a89")), "");
-    tb->addSeparator();
-    zoomOutAct = tb->addAction(FA::icon(FA::Minus, QColor("#6f7a89")), ""); zoomLbl = new QLabel(" 100% "); zoomLbl->setFixedWidth(52); zoomLbl->setAlignment(Qt::AlignCenter); tb->addWidget(zoomLbl); zoomInAct = tb->addAction(FA::icon(FA::Plus, QColor("#6f7a89")), "");
-    fitWAct = tb->addAction(FA::icon(FA::ArrowsLR, QColor("#6f7a89")), ""); fitPAct = tb->addAction(FA::icon(FA::Expand, QColor("#6f7a89")), "");
-    auto* sp2 = new QWidget; sp2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); tb->addWidget(sp2);
-    auto* rightTog = tb->addAction(FA::icon(FA::Sliders, QColor("#6f7a89")), ""); rightTog->setCheckable(true); rightTog->setChecked(true); rightTog->setToolTip("⌘2");
-    connect(rightTog, &QAction::toggled, this, [this](bool on) { if (rightDock) rightDock->setVisible(on); });
-    auto* l1 = new QShortcut(QKeySequence("Ctrl+1"), this); connect(l1, &QShortcut::activated, leftTog, &QAction::toggle);
-    auto* r2 = new QShortcut(QKeySequence("Ctrl+2"), this); connect(r2, &QShortcut::activated, rightTog, &QAction::toggle);
     langBox = new QComboBox; langBox->addItems({"ไทย", "EN"}); langBox->setCurrentIndex(I18n::lang() == "en" ? 1 : 0); tb->addWidget(langBox);
     settingsAct = tb->addAction(FA::icon(FA::Gear, QColor("#6f7a89")), "");
     // --- center ---
     center = new QStackedWidget; auto* wrap = new QWidget; auto* wv = new QVBoxLayout(wrap); wv->setContentsMargins(0, 0, 0, 0); wv->setSpacing(0);
     auto* rgb = new QFrame; rgb->setObjectName("rgbbar"); wv->addWidget(rgb);
+    auto* vbar = new QToolBar; vbar->setObjectName("viewbar"); vbar->setMovable(false); vbar->setIconSize(QSize(16, 16)); vbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    auto* leftTog = vbar->addAction(FA::icon(FA::Columns, QColor("#6f7a89"), 16), ""); leftTog->setCheckable(true); leftTog->setChecked(true); leftTog->setToolTip("⌘1");
+    connect(leftTog, &QAction::toggled, this, [this](bool on) { if (leftDock) leftDock->setVisible(on); });
+    auto* vsp = new QWidget; vsp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); vbar->addWidget(vsp);
+    prevAct = vbar->addAction(FA::icon(FA::ChevronUp, QColor("#6f7a89"), 16), ""); pageEdit = new QLineEdit; pageEdit->setFixedWidth(46); pageEdit->setAlignment(Qt::AlignCenter); vbar->addWidget(pageEdit); pageTotal = new QLabel(" / 0 "); vbar->addWidget(pageTotal); nextAct = vbar->addAction(FA::icon(FA::ChevronDown, QColor("#6f7a89"), 16), "");
+    vbar->addSeparator();
+    zoomOutAct = vbar->addAction(FA::icon(FA::Minus, QColor("#6f7a89"), 16), ""); zoomLbl = new QLabel(" 100% "); zoomLbl->setFixedWidth(52); zoomLbl->setAlignment(Qt::AlignCenter); vbar->addWidget(zoomLbl); zoomInAct = vbar->addAction(FA::icon(FA::Plus, QColor("#6f7a89"), 16), "");
+    fitWAct = vbar->addAction(FA::icon(FA::ArrowsLR, QColor("#6f7a89"), 16), ""); fitPAct = vbar->addAction(FA::icon(FA::Expand, QColor("#6f7a89"), 16), "");
+    auto* vsp2 = new QWidget; vsp2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); vbar->addWidget(vsp2);
+    auto* rightTog = vbar->addAction(FA::icon(FA::Sliders, QColor("#6f7a89"), 16), ""); rightTog->setCheckable(true); rightTog->setChecked(true); rightTog->setToolTip("⌘2");
+    connect(rightTog, &QAction::toggled, this, [this](bool on) { if (rightDock) rightDock->setVisible(on); });
+    auto* l1 = new QShortcut(QKeySequence("Ctrl+1"), this); connect(l1, &QShortcut::activated, leftTog, &QAction::toggle);
+    auto* r2 = new QShortcut(QKeySequence("Ctrl+2"), this); connect(r2, &QShortcut::activated, rightTog, &QAction::toggle);
+    wv->addWidget(vbar);
     home = new HomeView;
     viewer = new Viewer; center->addWidget(home); center->addWidget(viewer); wv->addWidget(center, 1); setCentralWidget(wrap);
     // --- docks ---
