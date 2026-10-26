@@ -85,7 +85,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(langBox, &QComboBox::currentIndexChanged, this, [this](int i) { I18n::setLang(i == 1 ? "en" : "th"); retranslate(); });
     retranslate(); refreshAll();
     // debug helper for screenshots: PDFDLP_START_TAB=pages[:N] opens the pages tab and selects page N
-    if (const QByteArray q = qgetenv("PDFDLP_SEARCH"); !q.isEmpty()) QTimer::singleShot(1800, this, [this, q]() { showSearch(); searchEdit->setText(QString::fromUtf8(q)); });
+    if (const QByteArray q = qgetenv("PDFDLP_SEARCH"); !q.isEmpty()) QTimer::singleShot(3000, this, [this, q]() { homeMode = false; searchbar->show(); searchEdit->setText(QString::fromUtf8(q)); runSearch(); });
     if (const QByteArray t = qgetenv("PDFDLP_START_TAB"); t.startsWith("pages")) QTimer::singleShot(1500, this, [this, t]() { sidebar->setCurrentIndex(1); const int n = t.contains(':') ? t.mid(t.indexOf(':') + 1).toInt() : 0; if (n > 0) { if (auto* l = sidebar->findChild<QListWidget*>("thumbs")) if (n <= l->count()) l->item(n - 1)->setSelected(true); } });
 }
 
@@ -181,9 +181,13 @@ bool MainWindow::writeBack(Document& d) {
     if (d.path.isEmpty() || !QFileInfo::exists(d.path) || d.path == d.workPath) return false;
     const QString bdir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/backup"; QDir().mkpath(bdir);
     const QString backup = bdir + "/" + QFileInfo(d.path).completeBaseName() + "-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + ".pdf";
-    QFile::copy(d.path, backup);
-    QFile::remove(d.path);
-    if (!QFile::copy(d.workPath, d.path)) { toast(TXT("error") + ": write back", "err"); return false; }
+    if (!QFile::copy(d.path, backup)) { toast(TXT("error") + ": backup " + QFile(d.path).errorString(), "err"); return false; }
+    // never delete the original first: copy next to it, then replace atomically
+    const QString tmp = d.path + ".pdfdlp-tmp"; QFile::remove(tmp);
+    QFile src(d.workPath);
+    if (!src.copy(tmp)) { toast(TXT("error") + ": write back (" + src.errorString() + ")", "err"); QFile::remove(tmp); return false; }
+    std::error_code ec; std::filesystem::rename(std::filesystem::path(tmp.toStdString()), std::filesystem::path(d.path.toStdString()), ec);
+    if (ec) { QFile::remove(tmp); toast(TXT("error") + ": write back (" + QString::fromStdString(ec.message()) + ")", "err"); return false; }
     d.modified = false; HomeView::remember(d.path, d.pages(), d.pdf->render(0, 186, 2.0)); return true;
 }
 void MainWindow::openProduced(const QString& path, const QString& name, const QString& password) {

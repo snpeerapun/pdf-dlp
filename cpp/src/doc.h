@@ -63,6 +63,14 @@ struct PdfDoc {
                         int ax, ay, bx, by; FPDF_PageToDevice(page, 0, 0, int(s.width()), int(s.height()), 0, l2, t2, &ax, &ay); FPDF_PageToDevice(page, 0, 0, int(s.width()), int(s.height()), 0, r2, b2, &bx, &by);
                         hit.rects << QRectF(QPointF(ax, ay), QPointF(bx, by)).normalized().adjusted(-1, -1, 1, 1);
                     }
+                    // merge per-glyph boxes on the same line into one highlight
+                    std::sort(hit.rects.begin(), hit.rects.end(), [](const QRectF& a, const QRectF& b) { return a.left() < b.left(); });
+                    QList<QRectF> merged;
+                    for (const QRectF& r : hit.rects) {
+                        if (!merged.isEmpty()) { QRectF& m = merged.last(); const double ov = std::min(m.bottom(), r.bottom()) - std::max(m.top(), r.top()); if (ov > std::min(m.height(), r.height()) * 0.5 && r.left() <= m.right() + 4) { m = m.united(r); continue; } }
+                        merged << r;
+                    }
+                    hit.rects = merged;
                     if (!hit.rects.isEmpty()) out << hit;
                 }
                 if (h) FPDFText_FindClose(h);
