@@ -89,10 +89,11 @@ void ClassifyPanel::load() { QSettings s; m_labels = QJsonDocument::fromJson(s.v
 void ClassifyPanel::save() { QSettings s; s.setValue("labels", QJsonDocument(m_labels).toJson(QJsonDocument::Compact)); }
 void ClassifyPanel::mergeLabels(const QJsonArray& add) {
     static const char* colors[] = {"#2ea043", "#4f8cff", "#f4b63f", "#ef5b5b", "#9b5cff"};
+    QSet<QString> used; for (const auto& v : m_labels) used << v.toObject().value("color").toString();
     for (const auto& av : add) {
         QJsonObject a = av.toObject(); bool found = false;
         for (int i = 0; i < m_labels.size(); i++) { QJsonObject c = m_labels[i].toObject(); if (c.value("id") == a.value("id")) { if (!a.value("name").toString().isEmpty()) c["name"] = a.value("name"); if (c.value("color").toString().isEmpty()) c["color"] = a.value("color"); m_labels[i] = c; found = true; break; } }
-        if (!found) { if (a.value("color").toString().isEmpty()) a["color"] = colors[m_labels.size() % 5]; a["order"] = m_labels.size(); m_labels.append(a); }
+        if (!found) { if (a.value("color").toString().isEmpty() || used.contains(a.value("color").toString())) a["color"] = colors[m_labels.size() % 5]; used << a.value("color").toString(); a["order"] = m_labels.size(); m_labels.append(a); }
     }
     save(); refreshList();
 }
