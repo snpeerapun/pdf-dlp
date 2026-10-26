@@ -1,35 +1,33 @@
 # PDF DLP — คู่มือโปรเจกต์ (สำหรับ Claude/Codex session ถัดไป)
 
-แอป desktop multi-platform: **PDF preview + tools (merge/split/หมุน/ลบ/แทรก/encrypt AES-256/redact/watermark/เลขหน้า/ครอป/บีบอัด/sanitize/รูป↔PDF)**
-+ **Data Classification** แบบที่ผู้ใช้เลือก/เปลี่ยนชั้นความลับของไฟล์เอง — เขียน metadata ในรูปแบบ **Microsoft Purview (MSIP_Label_*)**
-+ ประทับป้ายหัว/ท้าย/ลายน้ำที่ถอดออกได้ · ทำงานในเครื่อง 100% ไม่อัปโหลด
+แอป desktop **native C++ (Qt6 Widgets + PDFium)** บนแกน **Rust (lopdf)** ที่คอมไพล์เป็น static lib เรียกผ่าน C ABI
+= PDF preview + tools (merge/split/หมุน/ลบ/แทรก/แยกหน้า/encrypt AES-256/decrypt/redact/watermark/เลขหน้า/ครอป/บีบอัด/sanitize/รูป↔PDF/พิมพ์)
++ **Data Classification** ที่ผู้ใช้เลือก/เปลี่ยนชั้นความลับเอง → เขียน metadata แบบ **Microsoft Purview (MSIP_Label_*)** + ประทับป้ายหัว/ท้าย/ลายน้ำที่ถอดออกได้ + batch หลายไฟล์
+ทำงานในเครื่อง 100% · ธีมสว่าง + สีเน้น RGB · ไทย/อังกฤษ · Windows: คลิกขวาใน Explorer (registry HKCU) + single instance
 
-## สแตก (ตัดสินใจแล้ว — เจ้าของเลือก Tauri + Rust, ไม่เอา Flutter; ขอให้มีเวอร์ชัน C++ ทดลองเทียบความลื่น)
-- UI: React 18 + Vite + TS (`src/`), ธีมมืดเดียว, Font Awesome, i18n th/en (`src/i18n.ts`)
-- Preview: pdf.js v6 ใน webview — render queue (2 งานพร้อมกัน, ใกล้หน้าปัจจุบันก่อน), CSS-scale ระหว่างซูม, swap canvas ไม่กะพริบ (`src/lib/pdf.ts`, `src/components/Viewer.tsx`)
-- Core: Rust (`src-tauri/src/pdfops.rs`) บน **lopdf 0.46** — ทุก mutation = `apply_ops(path, password, ops[]) → temp file` แล้ว viewer โหลดใหม่ (ต้นฉบับไม่ถูกแก้จนกว่า "บันทึกเป็น")
-- Labels: `src-tauri/src/labels.rs` — อ่านจากแคช MIP/Office บน Windows (best-effort), เรียนรู้จากไฟล์ที่ติด label (PDF/OOXML), เขียน `MSIP_Label_{GUID}_Enabled/Name/SetDate/Method/ContentBits/ActionId/SiteId`
-- Windows คลิกขวา: `src-tauri/src/winshell.rs` (HKCU registry, ไม่ต้อง admin) + single-instance + fileAssociations .pdf + `--action open|classify|encrypt <file>`
-- ต้นแบบ C++: `cpp/` (Qt6 Widgets + PDFium prebuilt) — `./build.sh` แล้ว `build/pdfdlp_native.app/Contents/MacOS/pdfdlp_native <file.pdf>` (พิมพ์เวลาเรนเดอร์ต่อหน้าใน stderr)
+ประวัติการตัดสินใจ (เจ้าของสั่ง 2026-10-26): Flutter → Tauri+React → **ย้ายเป็น C++ ทั้งหมด ลบ React/Tauri ทิ้ง** (ต้องการ native + ความลื่น) · แกน Rust คงไว้เพราะเทสต์ผ่านครบและใช้ร่วมได้
 
-## รัน / ทดสอบ
-- `npm install` · `npx tauri dev` (เว็บอย่างเดียว: `npm run dev` แล้วเปิดไฟล์ผ่านปุ่ม — ops ที่ต้อง Rust ใช้ไม่ได้)
-- Rust tests (ของจริง: merge/rotate/delete/reorder/extract/encrypt-decrypt/stamp/remove_marks/redact/crop/sanitize/images→pdf ตรวจด้วย qpdf+pdftotext): `cd src-tauri && cargo test --test ops`
-- E2E ในแอปจริง (debug build): ขณะ `tauri dev` รัน เขียน `{"fixture":"<pdf>","out":"<dir>"}` ลง `/tmp/pdfdlp-selftest.json` → ผลที่ `<dir>/selftest-result.json` + `selftest-classified-p1.png`
-- Browser harness (เรนเดอร์/ซูม): `cp tools/ui-test.mjs ~/Projects/animation/_x.mjs && (cd ~/Projects/animation && node _x.mjs)`
-- fixtures: `python3 tools/make_fixtures.py` (Chrome headless, ไทย + ข้อมูลอ่อนไหวปลอม)
+## โครงสร้าง
+- `core/` — crate `pdfcore` (lopdf 0.46): `pdfops.rs` (ops ทั้งหมด), `labels.rs` (MSIP label discovery/metadata), `winshell.rs` (registry Windows) · tests: `core/tests/ops.rs` (ตรวจด้วย qpdf + pdftotext)
+- `core-ffi/` — staticlib `libpdfcore.a` + `pdfcore.h` (JSON in/out: `pdfcore_info/apply/merge/split/images_to_pdf/discover_labels/labels_from_file/msip_metadata/new_guid/shell`)
+- `cpp/src/` — `main.cpp` (fonts/theme/single-instance/`--selftest`), `mainwindow.*` (toolbar/docks/ops/undo/save), `viewer.*` (PDFium render queue 2 threads, CSS-like scale-then-swap, ctrl+wheel zoom), `sidebar.*` (files + thumbnails multi-select + right-click), `panels.*` (ToolsPanel/ClassifyPanel/InfoPanel), `dialogs.*` (ทุกเครื่องมือ), `stamps.*` (QPainter → PNG base64), `core.*` (bridge), `icons.h` (Font Awesome glyphs), `i18n.*`, `theme.qss`
+- `cpp/assets/fonts` — Noto Sans Thai + Font Awesome 6 OTF · `cpp/pdfium/` — prebuilt bblanchon (gitignored; โหลดใหม่ได้จาก releases)
+- `fixtures/` + `tools/make_fixtures.py` (Chrome headless สร้าง PDF ไทยทดสอบ) · `.github/workflows/build.yml` (Windows zip ผ่าน aqt + pdfium + windeployqt)
 
-## บทเรียน/กับดักที่เจอแล้ว
-- **lopdf เขียน /Encrypt ไม่มี `/Length 256` และ CF `/Length 32`** → poppler/pdf.js/lopdf เองอ่านไม่ออก (qpdf ทน) → patch dict หลัง `doc.encrypt()` (ดู `pdfops::encrypt`)
-- **เปิดไฟล์เข้ารหัสต้องใช้ `Document::load_with_password`** — `load()` + `decrypt()` ได้ objects ว่าง (pages=0)
-- หลัง `prune_objects` ต้อง `renumber_objects` ไม่งั้น qpdf เตือน Size ไม่ตรง
-- pdf.js v6: `render({canvas, canvasContext, viewport, transform})` ห้ามเรนเดอร์ canvas เดิมซ้อน (throw "same canvas") → ใช้ canvas ใหม่แล้ว swap
-- `.pages` เป็น flex column → `.page{flex:none}` ไม่งั้นหน้าถูกบีบสูง 0 (เจอจริง)
-- PDFium prebuilt (bblanchon) install name `./libpdfium.dylib` → ต้อง copy ไว้ข้าง binary + `install_name_tool` (อยู่ใน cpp/build.sh)
-- auto mode บล็อก `gh repo create`/push → ผู้ใช้ต้อง push เอง (`gh repo create snpeerapun/pdf-dlp --private --source=. --push`)
+## รัน / ทดสอบ (macOS)
+- build: `cd cpp && ./build.sh` → `build/PDF DLP.app` (bundle มี libpdfium.dylib, fonts, theme) · เปิด: `open "cpp/build/PDF DLP.app"` หรือ `"…/Contents/MacOS/PDF DLP" file.pdf`
+- Rust tests: `cd core && cargo test --test ops` (6 เทสต์: rotate/delete/reorder/extract, merge+ranges, encrypt-decrypt, stamp+metadata+remove_marks, redact+crop+sanitize, images→pdf)
+- E2E headless ทั้งสาย C++→Rust→PDFium: `"cpp/build/PDF DLP.app/Contents/MacOS/PDF DLP" --selftest fixtures/hr-confidential.pdf /tmp/out` → ต้อง `RESULT PASS` (10 ขั้น) + ดู `/tmp/out/selftest-classified-p1.png`
+- screenshot หน้าต่าง: Quartz หา owner `PDF DLP` เอาหน้าต่างใหญ่สุด แล้ว `screencapture -l <id>` (มีหน้าต่าง 500×500 ซ่อนของ Qt ปนมาด้วย)
+
+## บทเรียน/กับดัก
+- **lopdf**: `/Encrypt` ที่ lopdf เขียนไม่มี `/Length 256` + CF `/Length 32` → poppler/pdf.js/lopdf อ่านไม่ออก (qpdf ทน) → patch ใน `pdfops::encrypt` · เปิดไฟล์เข้ารหัสต้อง `Document::load_with_password` (`load()`+`decrypt()` ได้ objects ว่าง) · หลัง prune ต้อง `renumber_objects`
+- **Qt**: QSS `* { font-family }` ทับ `setFont()` → ไอคอน Font Awesome ใน QLabel ต้องตั้ง font-family ใน stylesheet (`FA::label`) · macro ชื่อ `T` ชน template ของ QtConcurrent → ใช้ `TXT()` · PDFium ไม่ thread-safe → ทุก FPDF_* ผ่าน `pdfiumLock()` · PDFium prebuilt install name `./libpdfium.dylib` → copy เข้า bundle + `install_name_tool` (อยู่ใน build.sh)
+- **edition 2024**: `#[unsafe(no_mangle)]` · if-let temporaries ต่างจาก 2021 (core ใช้ 2024)
+- auto mode บล็อก `gh repo create`/push → ผู้ใช้ push เอง: `gh repo create snpeerapun/pdf-dlp --private --source=. --push`
 
 ## งานค้าง / ขั้นต่อไป
-- ยืนยันการอ่าน label จากแคช Windows บนเครื่อง Windows จริง (ทดสอบ regex กับไฟล์ใน `%LocalAppData%\Microsoft\Office\CLP`) · ทางเลือก: Microsoft Graph `sensitivityLabels` (ต้องมี app registration + สิทธิ์ InformationProtectionPolicy.Read)
-- Windows exe ผ่าน GitHub Actions (`.github/workflows/build.yml`) หลัง push · notarize mac ตาม skill dropacross
-- ฟีเจอร์ Foxit ที่ยังไม่มี: ลายเซ็นดิจิทัล, OCR, แปลงเป็น Word/Excel, เปรียบเทียบไฟล์, แก้ข้อความเดิม, เข้ารหัสด้วย certificate, กรอกฟอร์ม, annotation แบบ interactive
-- ถ้าต้องการเรนเดอร์ native ใน Tauri: ใช้ `pdfium-render` crate + dylib เดียวกับ cpp/pdfium แล้วส่งภาพข้าม IPC
+- ยืนยันการอ่าน label จากแคช Windows (`%LocalAppData%\Microsoft\Office\CLP`, `…\MSIP`) บนเครื่อง Windows จริง · ทางเลือก Microsoft Graph `sensitivityLabels`
+- Windows: push แล้วดู Actions → ได้ `PDF-DLP-win64.zip` · ทดสอบคลิกขวา Explorer + single instance บน Windows จริง
+- mac: เซ็น/notarize ตาม skill dropacross · dmg + หน้า downloads (skill oneable-downloads)
+- ฟีเจอร์ Foxit ที่ยังไม่มี: ค้นหาข้อความ/เลือกข้อความ (PDFium text API มีแล้วใน `PdfDoc::pageText`), bookmark/outline, ไฟล์แนบ, annotation interactive, ลายเซ็นดิจิทัล, OCR, แปลงเป็น Word/Excel, เปรียบเทียบไฟล์, แก้ข้อความเดิม, เข้ารหัสด้วย certificate, กรอกฟอร์ม
