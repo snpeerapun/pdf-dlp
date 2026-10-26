@@ -85,7 +85,13 @@ void ClassifyPanel::retranslate() {
     applyBtn->setText(TXT("applyLabel")); batchBtn->setText(TXT("batch")); cbAutoSave->setText(TXT("autoSaveLabel")); cbAutoSave->setToolTip(TXT("autoSaveHint")); batchBtn->setToolTip(TXT("batchHint")); marksBadge->setText(TXT("marks"));
     if (m_labels.isEmpty()) notes->setText(TXT("noLabels"));
 }
-void ClassifyPanel::load() { QSettings s; m_labels = QJsonDocument::fromJson(s.value("labels").toByteArray()).array(); }
+void ClassifyPanel::load() {
+    QSettings s; m_labels = QJsonDocument::fromJson(s.value("labels").toByteArray()).array();
+    // labels that share one colour (e.g. all created with the old default) get distinct palette colours by order
+    static const char* colors[] = {"#2ea043", "#4f8cff", "#f4b63f", "#ef5b5b", "#9b5cff"};
+    QSet<QString> seen; bool dup = false; for (const auto& v : m_labels) { const QString c = v.toObject().value("color").toString(); if (seen.contains(c)) dup = true; seen << c; }
+    if (dup) { for (int i = 0; i < m_labels.size(); i++) { QJsonObject o = m_labels[i].toObject(); o["color"] = colors[i % 5]; m_labels[i] = o; } save(); }
+}
 void ClassifyPanel::save() { QSettings s; s.setValue("labels", QJsonDocument(m_labels).toJson(QJsonDocument::Compact)); }
 void ClassifyPanel::mergeLabels(const QJsonArray& add) {
     static const char* colors[] = {"#2ea043", "#4f8cff", "#f4b63f", "#ef5b5b", "#9b5cff"};
