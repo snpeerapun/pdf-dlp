@@ -55,7 +55,7 @@ struct Document {
     QString name, path, workPath, password;
     std::shared_ptr<PdfDoc> pdf;
     QJsonObject info;      // from core: pages, encrypted, classification, has_marks, metadata, msip
-    bool modified = false;
+    bool modified = false; bool checked = false;
     QStringList history;   // previous workPaths (undo)
     int pages() const { return pdf ? pdf->pages() : 0; }
     QString classification() const { const QString c = info.value("classification").toString(); return c.isEmpty() ? info.value("msip").toObject().value("name").toString() : c; }

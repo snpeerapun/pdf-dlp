@@ -19,11 +19,17 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     modifiedBadge = new QLabel; modifiedBadge->setObjectName("badgeWarn"); modifiedBadge->hide(); tb->addWidget(modifiedBadge);
     busyLbl = new QLabel; busyLbl->setObjectName("badgeInfo"); busyLbl->hide(); tb->addWidget(busyLbl);
     auto* sp = new QWidget; sp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); tb->addWidget(sp);
+    auto* leftTog = tb->addAction(FA::icon(FA::Columns, QColor("#6f7a89")), ""); leftTog->setCheckable(true); leftTog->setChecked(true); leftTog->setToolTip("⌘1");
+    connect(leftTog, &QAction::toggled, this, [this](bool on) { if (leftDock) leftDock->setVisible(on); });
     prevAct = tb->addAction(FA::icon(FA::ChevronUp, QColor("#6f7a89")), ""); pageEdit = new QLineEdit; pageEdit->setFixedWidth(46); pageEdit->setAlignment(Qt::AlignCenter); tb->addWidget(pageEdit); pageTotal = new QLabel(" / 0 "); tb->addWidget(pageTotal); nextAct = tb->addAction(FA::icon(FA::ChevronDown, QColor("#6f7a89")), "");
     tb->addSeparator();
     zoomOutAct = tb->addAction(FA::icon(FA::Minus, QColor("#6f7a89")), ""); zoomLbl = new QLabel(" 100% "); zoomLbl->setFixedWidth(52); zoomLbl->setAlignment(Qt::AlignCenter); tb->addWidget(zoomLbl); zoomInAct = tb->addAction(FA::icon(FA::Plus, QColor("#6f7a89")), "");
     fitWAct = tb->addAction(FA::icon(FA::ArrowsLR, QColor("#6f7a89")), ""); fitPAct = tb->addAction(FA::icon(FA::Expand, QColor("#6f7a89")), "");
     auto* sp2 = new QWidget; sp2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); tb->addWidget(sp2);
+    auto* rightTog = tb->addAction(FA::icon(FA::Sliders, QColor("#6f7a89")), ""); rightTog->setCheckable(true); rightTog->setChecked(true); rightTog->setToolTip("⌘2");
+    connect(rightTog, &QAction::toggled, this, [this](bool on) { if (rightDock) rightDock->setVisible(on); });
+    auto* l1 = new QShortcut(QKeySequence("Ctrl+1"), this); connect(l1, &QShortcut::activated, leftTog, &QAction::toggle);
+    auto* r2 = new QShortcut(QKeySequence("Ctrl+2"), this); connect(r2, &QShortcut::activated, rightTog, &QAction::toggle);
     langBox = new QComboBox; langBox->addItems({"ไทย", "EN"}); langBox->setCurrentIndex(I18n::lang() == "en" ? 1 : 0); tb->addWidget(langBox);
     settingsAct = tb->addAction(FA::icon(FA::Gear, QColor("#6f7a89")), "");
     // --- center ---
@@ -36,9 +42,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     emptyView->setStyleSheet("background:#e4e9f0;");
     viewer = new Viewer; center->addWidget(emptyView); center->addWidget(viewer); wv->addWidget(center, 1); setCentralWidget(wrap);
     // --- docks ---
-    sidebar = new Sidebar; leftDock = new QDockWidget; leftDock->setWidget(sidebar); leftDock->setFeatures(QDockWidget::NoDockWidgetFeatures); leftDock->setMinimumWidth(236); addDockWidget(Qt::LeftDockWidgetArea, leftDock);
+    sidebar = new Sidebar; leftDock = new QDockWidget; leftDock->setWidget(sidebar); leftDock->setFeatures(QDockWidget::NoDockWidgetFeatures); leftDock->setFixedWidth(230); leftDock->setTitleBarWidget(new QWidget); addDockWidget(Qt::LeftDockWidgetArea, leftDock);
     rightTabs = new QTabWidget; tools = new ToolsPanel; classify = new ClassifyPanel; infoPanel = new InfoPanel; rightTabs->addTab(tools, ""); rightTabs->addTab(classify, ""); rightTabs->addTab(infoPanel, "");
-    rightDock = new QDockWidget; rightDock->setWidget(rightTabs); rightDock->setFeatures(QDockWidget::NoDockWidgetFeatures); rightDock->setMinimumWidth(340); addDockWidget(Qt::RightDockWidgetArea, rightDock);
+    rightDock = new QDockWidget; rightDock->setWidget(rightTabs); rightDock->setFeatures(QDockWidget::NoDockWidgetFeatures); rightDock->setFixedWidth(330); rightDock->setTitleBarWidget(new QWidget); addDockWidget(Qt::RightDockWidgetArea, rightDock);
+    setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea); setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
     statusBar()->showMessage("");
     progress = new QProgressBar; progress->setFixedWidth(160); progress->setTextVisible(false); progress->hide(); statusBar()->addPermanentWidget(progress);
     // --- wiring ---
@@ -51,6 +58,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(viewer, &Viewer::zoomChanged, this, [this](double s) { zoomLbl->setText(QString("%1%").arg(int(s * 100 + 0.5))); });
     connect(viewer, &Viewer::pageChanged, this, [this](int p, int n) { pageEdit->setText(QString::number(p)); pageTotal->setText(QString(" / %1 ").arg(n)); sidebar->setCurrentPage(p); });
     connect(sidebar, &Sidebar::fileActivated, this, &MainWindow::setActive); connect(sidebar, &Sidebar::fileClosed, this, &MainWindow::closeDoc);
+    connect(sidebar, &Sidebar::fileChecked, this, [this](int i, bool on) { if (i >= 0 && i < int(docs.size())) docs[i].checked = on; });
     connect(sidebar, &Sidebar::pageActivated, this, [this](int p) { viewer->gotoPage(p); });
     connect(sidebar, &Sidebar::fileContextMenu, this, [this](int idx, QPoint pos) {
         QMenu m; auto* cp = m.addAction(FA::icon(FA::Copy, QColor("#6f7a89"), 14), TXT("copyPath")); auto* rv = m.addAction(FA::icon(FA::FolderOpen, QColor("#6f7a89"), 14), TXT("revealInFolder")); m.addSeparator(); auto* cl = m.addAction(FA::icon(FA::Xmark, QColor("#e5484d"), 14), TXT("closeFile"));
@@ -105,7 +113,7 @@ void MainWindow::setActive(int idx) {
     refreshAll();
 }
 void MainWindow::closeDoc(int idx) { if (idx < 0 || idx >= int(docs.size())) return; docs.erase(docs.begin() + idx); if (activeIdx >= int(docs.size())) activeIdx = int(docs.size()) - 1; refreshAll(); }
-void MainWindow::refreshFiles() { QStringList names; QList<bool> mods; for (auto& d : docs) { names << d.name; mods << d.modified; } sidebar->setFiles(names, mods, activeIdx); }
+void MainWindow::refreshFiles() { QStringList names; QList<bool> mods, chk; for (auto& d : docs) { names << d.name; mods << d.modified; chk << d.checked; } sidebar->setFiles(names, mods, chk, activeIdx); }
 void MainWindow::refreshAll() {
     refreshFiles();
     Document* d = active();
@@ -166,7 +174,7 @@ void MainWindow::tool(const QString& key) {
     else if (key == "encrypt") { auto r = Dialogs::encrypt(this); if (r.ok) runOps(r.ops, r.nextPassword); }
     else if (key == "decrypt") { if (Dialogs::decrypt(this, *d, ops)) runOps(ops, QString(""), false); }
     else if (key == "split") { QString mode, spec, dir; unsigned every = 1; if (Dialogs::split(this, *d, mode, spec, every, dir)) { setBusy(TXT("split")); const QString p = d->workPath, pw = d->password; Core::async([=]() { return Core::split(p, pw, mode, spec, every, dir); }, [this, dir](QJsonObject r) { setBusy(""); if (r.value("ok").toBool()) toast(QString("%1: %2 %3 → %4").arg(TXT("split")).arg(r.value("files").toArray().size()).arg(TXT("filesUnit"), dir)); else toast(r.value("error").toString(), "err"); }); } }
-    else if (key == "merge") { QStringList paths, names, open; for (auto& x : docs) { names << x.name; open << x.workPath; } if (Dialogs::merge(this, paths, names, open)) { QJsonArray inputs; for (const QString& p : paths) { QJsonObject o{{"path", p}}; for (auto& x : docs) if (x.workPath == p) o["password"] = x.password; inputs.append(o); } setBusy(TXT("merge")); Core::async([=]() { return Core::merge(inputs); }, [this](QJsonObject r) { setBusy(""); if (r.value("ok").toBool()) openProduced(r.value("path").toString(), "merged.pdf"); else toast(r.value("error").toString(), "err"); }); } }
+    else if (key == "merge") { QStringList paths, names, open; const bool anyChecked = std::any_of(docs.begin(), docs.end(), [](const Document& x) { return x.checked; }); for (auto& x : docs) if (!anyChecked || x.checked) { names << x.name; open << x.workPath; } if (Dialogs::merge(this, paths, names, open)) { QJsonArray inputs; for (const QString& p : paths) { QJsonObject o{{"path", p}}; for (auto& x : docs) if (x.workPath == p) o["password"] = x.password; inputs.append(o); } setBusy(TXT("merge")); Core::async([=]() { return Core::merge(inputs); }, [this](QJsonObject r) { setBusy(""); if (r.value("ok").toBool()) openProduced(r.value("path").toString(), "merged.pdf"); else toast(r.value("error").toString(), "err"); }); } }
     else if (key == "insert") { QString file; int after = 0; if (Dialogs::insertPages(this, *d, viewer->currentPage() + 1, file, after)) { QJsonArray inputs; QJsonArray before, afterArr; for (int i = 1; i <= after; i++) before.append(i); for (int i = after + 1; i <= d->pages(); i++) afterArr.append(i); if (!before.isEmpty()) inputs.append(QJsonObject{{"path", d->workPath}, {"password", d->password}, {"pages", before}}); inputs.append(QJsonObject{{"path", file}}); if (!afterArr.isEmpty()) inputs.append(QJsonObject{{"path", d->workPath}, {"password", d->password}, {"pages", afterArr}}); setBusy(TXT("insert")); const int idx = activeIdx; Core::async([=]() { return Core::merge(inputs); }, [this, idx](QJsonObject r) { setBusy(""); if (idx != activeIdx) return; if (r.value("ok").toBool()) reloadActive(r.value("path").toString(), "", true); else toast(r.value("error").toString(), "err"); }); } }
     else if (key == "watermark") { if (Dialogs::watermark(this, sidebar->selectedPages(), ops)) runOps(ops); }
     else if (key == "pagenum") { if (Dialogs::pageNumbers(this, *d, ops)) runOps(ops); }
@@ -189,9 +197,22 @@ void MainWindow::applyLabel() {
 void MainWindow::removeLabel() { Document* d = active(); if (!d) return; runOps(classify->buildRemoveOps(d->info.value("metadata").toObject())); toast(TXT("labelRemoved")); }
 void MainWindow::batchLabel() {
     const QJsonObject label = classify->selectedLabel(); if (label.isEmpty()) return;
+    // checked open files → apply in place (undoable, saved later); none checked → pick files + output folder
+    std::vector<int> checkedIdx; for (int i = 0; i < int(docs.size()); i++) if (docs[i].checked) checkedIdx.push_back(i);
+    int ok = 0;
+    if (!checkedIdx.empty()) {
+        for (size_t k = 0; k < checkedIdx.size(); k++) {
+            Document& d = docs[checkedIdx[k]]; setBusy(QString("%1 %2/%3").arg(TXT("batch")).arg(k + 1).arg(checkedIdx.size()));
+            QString next; const QJsonArray ops = classify->buildOps(label, d.info.value("metadata").toObject(), &next);
+            const QJsonObject r = Core::apply(d.workPath, d.password, ops);
+            if (!r.value("ok").toBool()) { toast(QString("%1: %2").arg(d.name, r.value("error").toString()), "err"); continue; }
+            const QString newPw = next.isEmpty() ? d.password : next; bool needs = false; auto pdf = PdfDoc::open(r.value("path").toString(), newPw, &needs); if (!pdf) continue;
+            d.history << d.workPath; d.workPath = r.value("path").toString(); d.password = newPw; d.pdf = pdf; d.modified = true; d.info = Core::info(d.workPath, newPw); ok++;
+        }
+        setBusy(""); refreshAll(); toast(QString("%1 %2: %3/%4").arg(TXT("batch"), TXT("done")).arg(ok).arg(checkedIdx.size())); return;
+    }
     const QStringList files = QFileDialog::getOpenFileNames(this, TXT("batch"), QString(), "PDF (*.pdf)"); if (files.isEmpty()) return;
     const QString dir = QFileDialog::getExistingDirectory(this, TXT("chooseFolder")); if (dir.isEmpty()) return;
-    int ok = 0;
     for (int i = 0; i < files.size(); i++) {
         setBusy(QString("%1 %2/%3").arg(TXT("batch")).arg(i + 1).arg(files.size()));
         QString next; const QJsonArray ops = classify->buildOps(label, {}, &next);

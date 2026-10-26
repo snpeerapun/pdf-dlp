@@ -47,6 +47,33 @@ Viewer::Viewer(QWidget* parent) : QScrollArea(parent) {
     wantTimer.setSingleShot(true); wantTimer.setInterval(40);
     connect(&wantTimer, &QTimer::timeout, this, &Viewer::updateWanted);
     setFocusPolicy(Qt::StrongFocus);
+    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);   // no horizontal bar: trackpad swipe still pans
+    setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    viewport()->grabGesture(Qt::PinchGesture);
+}
+bool Viewer::viewportEvent(QEvent* e) {
+    if (e->type() == QEvent::NativeGesture) {           // macOS trackpad pinch (smooth, per-frame deltas)
+        auto* g = static_cast<QNativeGestureEvent*>(e);
+        if (g->gestureType() == Qt::ZoomNativeGesture) { zoomAt(g->position(), sc * (1.0 + g->value())); return true; }
+        if (g->gestureType() == Qt::SmartZoomNativeGesture) { if (fit == 1) zoomAt(g->position(), sc * 2.0); else fitWidth(); return true; }
+    } else if (e->type() == QEvent::Gesture) {           // generic pinch (Windows/Linux touchpads & touch screens)
+        auto* ge = static_cast<QGestureEvent*>(e);
+        if (auto* pinch = static_cast<QPinchGesture*>(ge->gesture(Qt::PinchGesture))) {
+            if (pinch->changeFlags() & QPinchGesture::ScaleFactorChanged) zoomAt(viewport()->mapFromGlobal(pinch->centerPoint().toPoint()), sc * pinch->scaleFactor());
+            return true;
+        }
+    }
+    return QScrollArea::viewportEvent(e);
+}
+void Viewer::zoomAt(const QPointF& vp, double s) {
+    const double old = sc; fit = 0; sc = std::clamp(s, 0.2, 6.0);
+    if (std::abs(sc - old) < 1e-4) return;
+    // keep the document point under the pointer fixed
+    const double docX = horizontalScrollBar()->value() + vp.x(), docY = verticalScrollBar()->value() + vp.y();
+    relayout();
+    const double r = sc / old;
+    horizontalScrollBar()->setValue(int(docX * r - vp.x()));
+    verticalScrollBar()->setValue(int(docY * r - vp.y()));
 }
 void Viewer::clear() { for (auto* p : pages) { vbox->removeWidget(p); p->deleteLater(); } pages.clear(); doc.reset(); cur = 0; }
 void Viewer::setDocument(std::shared_ptr<PdfDoc> d) {
@@ -57,8 +84,9 @@ void Viewer::setDocument(std::shared_ptr<PdfDoc> d) {
 void Viewer::relayout() {
     if (!doc) return;
     double maxW = 1, maxH = 1; for (auto& s : doc->sizes) { maxW = std::max(maxW, s.width()); maxH = std::max(maxH, s.height()); }
-    if (fit == 1) sc = (viewport()->width() - PAD * 2 - 12) / maxW;
-    else if (fit == 2) sc = std::min((viewport()->width() - PAD * 2 - 12) / maxW, (viewport()->height() - PAD * 2) / maxH);
+    const int avail = width() - verticalScrollBar()->sizeHint().width() - 2;
+    if (fit == 1) sc = (avail - PAD * 2) / maxW;
+    else if (fit == 2) sc = std::min((avail - PAD * 2) / maxW, (viewport()->height() - PAD * 2) / maxH);
     for (auto* p : pages) p->setScale(sc);
     emit zoomChanged(sc); wantTimer.start();
 }
@@ -95,7 +123,7 @@ void Viewer::gotoPage(int n) {
     cur = n - 1; emit pageChanged(n, int(pages.size())); wantTimer.start();
 }
 void Viewer::wheelEvent(QWheelEvent* e) {
-    if (e->modifiers() & (Qt::ControlModifier | Qt::MetaModifier)) { const double k = std::exp(e->angleDelta().y() / 600.0); zoomTo(sc * k); e->accept(); return; }
+    if (e->modifiers() & (Qt::ControlModifier | Qt::MetaModifier)) { const double k = std::exp(e->angleDelta().y() / 600.0); zoomAt(e->position(), sc * k); e->accept(); return; }
     QScrollArea::wheelEvent(e);
 }
 void Viewer::keyPressEvent(QKeyEvent* e) {

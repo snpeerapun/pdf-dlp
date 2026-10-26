@@ -24,13 +24,13 @@ ToolsPanel::ToolsPanel(QWidget* parent) : QScrollArea(parent) {
     for (auto d : defs) {
         auto* b = new QPushButton; b->setProperty("class", "tool"); b->setCursor(Qt::PointingHandCursor);
         auto* v = new QVBoxLayout(b); v->setContentsMargins(4, 8, 4, 6); v->setSpacing(4);
-        auto* ic = FA::label(d.icon, QColor(d.color), 20); ic->setAlignment(Qt::AlignCenter); auto* lb = new QLabel; lb->setAlignment(Qt::AlignCenter); lb->setObjectName("toollbl"); lb->setStyleSheet("background:transparent;font-size:12px;"); lb->setWordWrap(true);
-        v->addWidget(ic); v->addWidget(lb);
-        b->setMinimumHeight(70); grid->addWidget(b, i / 3, i % 3); i++;
+        auto* ic = FA::label(d.icon, QColor(d.color), 18); ic->setAlignment(Qt::AlignCenter); auto* lb = new QLabel; lb->setAlignment(Qt::AlignCenter); lb->setObjectName("toollbl"); lb->setStyleSheet("background:transparent;font-size:11.5px;"); lb->setWordWrap(true);
+        v->setContentsMargins(2, 6, 2, 4); v->setSpacing(2); v->addWidget(ic); v->addWidget(lb);
+        b->setMinimumHeight(58); b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed); grid->addWidget(b, i / 3, i % 3); i++;
         const QString key = d.key; connect(b, &QPushButton::clicked, this, [this, key]() { emit tool(key); });
         d.b = b; btns << d;
     }
-    auto* g = new QGroupBox(TXT("tools")); g->setLayout(grid); static_cast<QVBoxLayout*>(body->layout())->addWidget(g);
+    grid->setSpacing(6); static_cast<QVBoxLayout*>(body->layout())->addLayout(grid); static_cast<QVBoxLayout*>(body->layout())->setContentsMargins(10, 10, 10, 10);
     retranslate();
 }
 void ToolsPanel::retranslate() { for (auto& d : btns) d.b->findChild<QLabel*>("toollbl")->setText(TXT(d.label)); }

@@ -25,7 +25,7 @@ private:
     void toast(const QString& text, const QString& kind = "ok");
 
     std::vector<Document> docs; int activeIdx = -1;
-    Viewer* viewer; Sidebar* sidebar; ToolsPanel* tools; ClassifyPanel* classify; InfoPanel* infoPanel; QTabWidget* rightTabs; QDockWidget *leftDock, *rightDock;
+    Viewer* viewer; Sidebar* sidebar; ToolsPanel* tools; ClassifyPanel* classify; InfoPanel* infoPanel; QTabWidget* rightTabs; QDockWidget *leftDock = nullptr, *rightDock = nullptr;
     QToolBar* tb; QAction *openAct, *saveAct, *undoAct, *settingsAct, *zoomInAct, *zoomOutAct, *fitWAct, *fitPAct, *prevAct, *nextAct; QLabel* zoomLbl; QLineEdit* pageEdit; QLabel* pageTotal; QLabel* modifiedBadge; QLabel* busyLbl; QComboBox* langBox; QWidget* emptyView; QStackedWidget* center;
     QProgressBar* progress;
 };

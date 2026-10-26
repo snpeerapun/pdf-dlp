@@ -24,7 +24,7 @@ public:
     explicit Viewer(QWidget* parent = nullptr);
     void setDocument(std::shared_ptr<PdfDoc> d);
     void clear();
-    void zoomTo(double s); void zoomStep(int dir); void fitWidth(); void fitPage();
+    void zoomTo(double s); void zoomAt(const QPointF& viewportPos, double s); void zoomStep(int dir); void fitWidth(); void fitPage();
     void gotoPage(int oneBased);
     double scale() const { return sc; }
     int currentPage() const { return cur; }
@@ -32,7 +32,7 @@ public:
 signals:
     void zoomChanged(double); void pageChanged(int, int);
 protected:
-    void wheelEvent(QWheelEvent* e) override; void resizeEvent(QResizeEvent* e) override; void scrollContentsBy(int dx, int dy) override; void keyPressEvent(QKeyEvent* e) override;
+    void wheelEvent(QWheelEvent* e) override; void resizeEvent(QResizeEvent* e) override; void scrollContentsBy(int dx, int dy) override; void keyPressEvent(QKeyEvent* e) override; bool viewportEvent(QEvent* e) override;
 private:
     void relayout(); void updateWanted();
     std::shared_ptr<PdfDoc> doc; QWidget* content; QVBoxLayout* vbox; std::vector<PageWidget*> pages; double sc = 1.0; int fit = 1; int cur = 0; QTimer wantTimer; bool programmatic = false;
