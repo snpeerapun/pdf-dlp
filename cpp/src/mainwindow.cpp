@@ -82,6 +82,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(classify, &ClassifyPanel::applyRequested, this, &MainWindow::applyLabel); connect(classify, &ClassifyPanel::removeRequested, this, &MainWindow::removeLabel); connect(classify, &ClassifyPanel::batchRequested, this, &MainWindow::batchLabel);
     connect(langBox, &QComboBox::currentIndexChanged, this, [this](int i) { I18n::setLang(i == 1 ? "en" : "th"); retranslate(); });
     retranslate(); refreshAll();
+    // debug helper for screenshots: PDFDLP_START_TAB=pages[:N] opens the pages tab and selects page N
+    if (const QByteArray t = qgetenv("PDFDLP_START_TAB"); t.startsWith("pages")) QTimer::singleShot(1500, this, [this, t]() { sidebar->setCurrentIndex(1); const int n = t.contains(':') ? t.mid(t.indexOf(':') + 1).toInt() : 0; if (n > 0) { if (auto* l = sidebar->findChild<QListWidget*>("thumbs")) if (n <= l->count()) l->item(n - 1)->setSelected(true); } });
 }
 
 void MainWindow::buildToolbox() {

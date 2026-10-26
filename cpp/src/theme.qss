@@ -34,10 +34,9 @@ QScrollArea { border: 0; }
 QListWidget { background: #ffffff; border: 0; outline: 0; }
 QListWidget#files::item { padding: 6px 4px; margin: 0; background: transparent; }
 QListWidget#files::item:selected { background: transparent; color: #1f2733; }
-QListWidget#thumbs { background: #f5f7fb; padding: 8px; }
-QListWidget#thumbs::item { margin: 6px; border-radius: 8px; padding: 6px; }
-QListWidget#thumbs::item:selected { background: #fff3d6; border: 2px solid #f4b63f; }
-QListWidget#thumbs::item:hover { background: #eef2f8; }
+QListWidget#thumbs { background: #f5f7fb; padding: 4px; }
+QListWidget#thumbs::item { margin: 0; padding: 0; background: transparent; }
+QListWidget#thumbs::item:selected { background: transparent; }
 QPushButton { background: #ffffff; border: 1px solid #d7dee8; border-radius: 8px; padding: 6px 12px; }
 QPushButton:hover { background: #f1f4f9; border-color: #c5cfdc; }
 QPushButton:disabled { color: #a3adbb; }
