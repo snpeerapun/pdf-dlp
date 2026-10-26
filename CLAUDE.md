@@ -20,6 +20,14 @@
 - E2E headless ทั้งสาย C++→Rust→PDFium: `"cpp/build/PDF DLP.app/Contents/MacOS/PDF DLP" --selftest fixtures/hr-confidential.pdf /tmp/out` → ต้อง `RESULT PASS` (10 ขั้น) + ดู `/tmp/out/selftest-classified-p1.png`
 - screenshot หน้าต่าง: Quartz หา owner `PDF DLP` เอาหน้าต่างใหญ่สุด แล้ว `screencapture -l <id>` (มีหน้าต่าง 500×500 ซ่อนของ Qt ปนมาด้วย)
 
+## โหมดแก้ไข (cpp/src/edit.*) — ข้อตกลงสำคัญ
+- EditSession เปิด FPDF_DOCUMENT แยก + form-fill env · **ห้ามเรียก PDFium เขียน content stream เดิมใหม่** (`FPDFPageObj_Transform`/`RemoveObject` บน object เดิม → `FPDFPage_GenerateContent` เขียน stream ใหม่แล้วตัวหนังสือหายทั้งหน้าใน PDF จาก Chrome/Skia — พิสูจน์ด้วย `--editdebug`)
+  ⇒ ย้าย/แก้/ลบ object เดิม = **ปิดทับด้วยกล่องขาว + วาง object ใหม่** (เพิ่มเข้า stream ใหม่เท่านั้น) · ของที่ไม่ได้แตะคงเดิมไบต์ต่อไบต์
+- PDF จาก Chrome แตก text เป็น object ละ 1 glyph + สระ/วรรณยุกต์เป็น object จิ๋วแยก → `objects()` รวมเป็น "บรรทัด" (ซ้อนแนวตั้ง/ช่องว่าง ≤1.6×สูง) และสร้างข้อความบรรทัดจาก glyph ฐาน โดยข้าม mark object ที่ซ้ำ (เช็คทั้งก่อน/หลังใน x-order)
+- ข้อความที่วางใหม่ใช้ฟอนต์ฝัง (TTF ใน `assets/fonts/edit`, CID) เสมอ — SetText กับฟอนต์เดิมของเอกสารแปลง charcode ไม่ได้ (เรนเดอร์ว่าง)
+- ช่องฟอร์มใหม่สร้างฝั่ง Rust (`Op::AddField`) หลัง PDFium save · กรอกฟอร์มเดิมผ่าน FORM_On* + FFLDraw
+- debug: `"PDF DLP" --editdebug <pdf> <outdir>` เรนเดอร์ 9 กรณีเทียบ · selftest มีขั้น edit
+
 ## บทเรียน/กับดัก
 - **lopdf**: `/Encrypt` ที่ lopdf เขียนไม่มี `/Length 256` + CF `/Length 32` → poppler/pdf.js/lopdf อ่านไม่ออก (qpdf ทน) → patch ใน `pdfops::encrypt` · เปิดไฟล์เข้ารหัสต้อง `Document::load_with_password` (`load()`+`decrypt()` ได้ objects ว่าง) · หลัง prune ต้อง `renumber_objects`
 - **Qt**: QSS `* { font-family }` ทับ `setFont()` → ไอคอน Font Awesome ใน QLabel ต้องตั้ง font-family ใน stylesheet (`FA::label`) · macro ชื่อ `T` ชน template ของ QtConcurrent → ใช้ `TXT()` · PDFium ไม่ thread-safe → ทุก FPDF_* ผ่าน `pdfiumLock()` · PDFium prebuilt install name `./libpdfium.dylib` → copy เข้า bundle + `install_name_tool` (อยู่ใน build.sh)
@@ -30,4 +38,5 @@
 - ยืนยันการอ่าน label จากแคช Windows (`%LocalAppData%\Microsoft\Office\CLP`, `…\MSIP`) บนเครื่อง Windows จริง · ทางเลือก Microsoft Graph `sensitivityLabels`
 - Windows: push แล้วดู Actions → ได้ `PDF-DLP-win64.zip` · ทดสอบคลิกขวา Explorer + single instance บน Windows จริง
 - mac: เซ็น/notarize ตาม skill dropacross · dmg + หน้า downloads (skill oneable-downloads)
+- ทำแล้วรอบ 2026-10-26 (บ่าย): home card recent+pinned, toolbox บน, viewbar, checkbox ไฟล์, email แนบไฟล์ (Outlook/Mail), edit mode (text/image/line/box/field/checkbox/form-fill, 25 ฟอนต์ TH/EN), present (F5), classification auto write-back (สำรองที่ AppData/backup)
 - ฟีเจอร์ Foxit ที่ยังไม่มี: ค้นหาข้อความ/เลือกข้อความ (PDFium text API มีแล้วใน `PdfDoc::pageText`), bookmark/outline, ไฟล์แนบ, annotation interactive, ลายเซ็นดิจิทัล, OCR, แปลงเป็น Word/Excel, เปรียบเทียบไฟล์, แก้ข้อความเดิม, เข้ารหัสด้วย certificate, กรอกฟอร์ม
