@@ -2,6 +2,8 @@ name: build-native
 on:
   push: { branches: [main], tags: ['v*'] }
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   windows:
     runs-on: windows-latest
