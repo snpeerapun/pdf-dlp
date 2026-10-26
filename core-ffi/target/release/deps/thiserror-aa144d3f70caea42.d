@@ -1,0 +1,14 @@
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/thiserror-aa144d3f70caea42.d: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/aserror.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/display.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/var.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/private.rs /Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/thiserror-5debada4ce4503a4/out/private.rs
+
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/libthiserror-aa144d3f70caea42.rlib: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/aserror.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/display.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/var.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/private.rs /Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/thiserror-5debada4ce4503a4/out/private.rs
+
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/libthiserror-aa144d3f70caea42.rmeta: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/aserror.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/display.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/var.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/private.rs /Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/thiserror-5debada4ce4503a4/out/private.rs
+
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/lib.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/aserror.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/display.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/var.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.21/src/private.rs:
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/thiserror-5debada4ce4503a4/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/thiserror-5debada4ce4503a4/out

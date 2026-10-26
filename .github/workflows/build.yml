@@ -1,51 +1,36 @@
-name: build-desktop
+name: build-native
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
+  push: { branches: [main], tags: ['v*'] }
   workflow_dispatch:
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            args: ''
-          - os: ubuntu-22.04
-            args: ''
-          - os: macos-latest
-            args: '--target universal-apple-darwin'
-    runs-on: ${{ matrix.os }}
+  windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-      - name: Linux deps
-        if: matrix.os == 'ubuntu-22.04'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-      - uses: swatinem/rust-cache@v2
-        with: { workspaces: src-tauri }
-      - run: npm ci
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: ${{ matrix.args }}
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('PDF DLP {0}', github.ref_name) || '' }}
-          releaseDraft: false
-          prerelease: false
+      - uses: jurplel/install-qt-action@v4
+        with: { version: '6.8.*', modules: '', cache: true }
+      - name: PDFium prebuilt
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-win-x64.tgz -OutFile pdfium.tgz
+          New-Item -ItemType Directory -Force cpp/pdfium | Out-Null
+          tar -xzf pdfium.tgz -C cpp/pdfium
+      - name: Rust core
+        run: cargo build --release --manifest-path core-ffi/Cargo.toml
+      - name: Configure & build
+        shell: pwsh
+        run: |
+          cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release -DPDFCORE_LIB="$PWD/core-ffi/target/release/pdfcore.lib"
+          cmake --build cpp/build --config Release
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = "dist/PDF-DLP-win64"; New-Item -ItemType Directory -Force "$out/fonts" | Out-Null
+          Copy-Item cpp/build/Release/pdfdlp.exe "$out/PDF DLP.exe"
+          Copy-Item cpp/pdfium/bin/pdfium.dll $out/
+          Copy-Item cpp/assets/fonts/* "$out/fonts/"; Copy-Item cpp/src/theme.qss $out/
+          & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations "$out/PDF DLP.exe"
+          Compress-Archive -Path $out -DestinationPath dist/PDF-DLP-win64.zip
       - uses: actions/upload-artifact@v4
-        with:
-          name: pdf-dlp-${{ matrix.os }}
-          path: |
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
-          if-no-files-found: ignore
+        with: { name: PDF-DLP-win64, path: dist/PDF-DLP-win64.zip }

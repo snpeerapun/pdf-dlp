@@ -1,0 +1,14 @@
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/serde-3682ca3df1e1b4c4.d: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/serde-eb51dc685e203498/out/private.rs
+
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/libserde-3682ca3df1e1b4c4.rlib: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/serde-eb51dc685e203498/out/private.rs
+
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/libserde-3682ca3df1e1b4c4.rmeta: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/serde-eb51dc685e203498/out/private.rs
+
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/serde-eb51dc685e203498/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/build/serde-eb51dc685e203498/out

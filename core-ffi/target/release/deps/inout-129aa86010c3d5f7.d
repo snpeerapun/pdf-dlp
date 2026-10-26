@@ -1,0 +1,11 @@
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/inout-129aa86010c3d5f7.d: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/errors.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/inout.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/inout_buf.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/reserved.rs
+
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/libinout-129aa86010c3d5f7.rlib: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/errors.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/inout.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/inout_buf.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/reserved.rs
+
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/deps/libinout-129aa86010c3d5f7.rmeta: /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/lib.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/errors.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/inout.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/inout_buf.rs /Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/reserved.rs
+
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/lib.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/errors.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/inout.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/inout_buf.rs:
+/Users/peerapuns/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/inout-0.2.5/src/reserved.rs:

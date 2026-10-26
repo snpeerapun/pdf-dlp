@@ -1,0 +1,1 @@
+/Users/peerapuns/Projects/pdf-dlp/core-ffi/target/release/libpdfcore.a: /Users/peerapuns/Projects/pdf-dlp/core/src/labels.rs /Users/peerapuns/Projects/pdf-dlp/core/src/lib.rs /Users/peerapuns/Projects/pdf-dlp/core/src/pdfops.rs /Users/peerapuns/Projects/pdf-dlp/core/src/winshell.rs /Users/peerapuns/Projects/pdf-dlp/core-ffi/src/lib.rs
