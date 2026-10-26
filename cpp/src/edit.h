@@ -10,7 +10,7 @@
 #include <set>
 #include <algorithm>
 
-struct EditObject { int index = -1; int type = 0; QRectF rect; QString text; float fontSize = 0; bool subsetFont = false; QList<int> members; /* glyph objects merged into this line */ };
+struct EditObject { int index = -1; int type = 0; QRectF rect; QString text; float fontSize = 0; bool subsetFont = false; bool bold = false; QString color; QList<int> members; /* glyph objects merged into this line */ };
 
 class EditSession {
 public:

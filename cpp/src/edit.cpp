@@ -65,7 +65,8 @@ QList<EditObject> EditSession::objects(int page) {
             const unsigned long len = FPDFTextObj_GetText(o, tp, nullptr, 0);
             if (len > 0) { std::vector<unsigned short> buf(len / 2 + 1); FPDFTextObj_GetText(o, tp, buf.data(), len); e.text = QString::fromUtf16(reinterpret_cast<const char16_t*>(buf.data())); }
             float fs = 0; FPDFTextObj_GetFontSize(o, &fs); e.fontSize = fs;
-            if (FPDF_FONT f = FPDFTextObj_GetFont(o)) { char name[128] = {0}; FPDFFont_GetBaseFontName(f, name, sizeof(name)); e.subsetFont = QString(name).contains('+'); }
+            if (FPDF_FONT f = FPDFTextObj_GetFont(o)) { char name[128] = {0}; FPDFFont_GetBaseFontName(f, name, sizeof(name)); const QString nm = QString(name); e.subsetFont = nm.contains('+'); int wt = FPDFFont_GetWeight(f); e.bold = wt >= 600 || nm.contains("Bold", Qt::CaseInsensitive); }
+            unsigned int R = 0, G = 0, B = 0, A = 255; if (FPDFPageObj_GetFillColor(o, &R, &G, &B, &A)) e.color = QString("#%1%2%3").arg(R, 2, 16, QChar('0')).arg(G, 2, 16, QChar('0')).arg(B, 2, 16, QChar('0'));
         }
         if (e.rect.width() < 0.3 && e.rect.height() < 0.3) continue;
         raw << e;
@@ -125,7 +126,7 @@ QList<EditObject> EditSession::objects(int page) {
 }
 EditObject EditSession::objectAt(int page, QPointF v) {
     EditObject best; double bestArea = 1e18;
-    for (const EditObject& e : objects(page)) { if (e.type == FPDF_PAGEOBJ_PATH && e.rect.width() * e.rect.height() > sizes[page].width() * sizes[page].height() * 0.6) continue; if (e.rect.adjusted(-2, -2, 2, 2).contains(v)) { const double a = e.rect.width() * e.rect.height(); if (a < bestArea) { bestArea = a; best = e; } } }
+    for (const EditObject& e : objects(page)) { if (e.type == FPDF_PAGEOBJ_PATH && e.rect.width() * e.rect.height() > sizes[page].width() * sizes[page].height() * 0.85) continue; if (e.rect.adjusted(-2, -2, 2, 2).contains(v)) { const double a = e.rect.width() * e.rect.height(); if (a < bestArea) { bestArea = a; best = e; } } }
     return best;
 }
 void EditSession::whiteout(int page, QRectF r) {
@@ -155,7 +156,28 @@ void EditSession::move(int page, int index, QPointF d) {
         FPDF_BITMAP bmp = FPDFImageObj_GetBitmap(o); if (!bmp) return;
         FS_MATRIX m{}; FPDFPageObj_GetMatrix(o, &m); n = FPDFPageObj_NewImageObj(doc); FPDF_PAGE pages[1] = {p}; FPDFImageObj_SetBitmap(pages, 1, n, bmp); FPDFBitmap_Destroy(bmp);
         m.e += float(dx); m.f += float(dy); FPDFPageObj_SetMatrix(n, &m);
-    } else { lastNote = "paths"; return; }
+    } else if (e.type == FPDF_PAGEOBJ_PATH) {
+        const int ns = FPDFPath_CountSegments(o); if (ns <= 0) return;
+        float sx = 0, sy = 0; bool started = false;
+        for (int si = 0; si < ns; si++) {
+            FPDF_PATHSEGMENT seg = FPDFPath_GetPathSegment(o, si); float x, y; FPDFPathSegment_GetPoint(seg, &x, &y); const int st = FPDFPathSegment_GetType(seg);
+            if (!started) { n = FPDFPageObj_CreateNewPath(x, y); started = true; sx = x; sy = y; continue; }
+            if (st == FPDF_SEGMENT_MOVETO) FPDFPath_MoveTo(n, x, y);
+            else if (st == FPDF_SEGMENT_LINETO) FPDFPath_LineTo(n, x, y);
+            else if (st == FPDF_SEGMENT_BEZIERTO) { // three consecutive bezier points
+                if (si + 2 < ns) { float x2, y2, x3, y3; FPDFPathSegment_GetPoint(FPDFPath_GetPathSegment(o, si + 1), &x2, &y2); FPDFPathSegment_GetPoint(FPDFPath_GetPathSegment(o, si + 2), &x3, &y3); FPDFPath_BezierTo(n, x, y, x2, y2, x3, y3); si += 2; }
+            }
+            if (FPDFPathSegment_GetClose(seg)) FPDFPath_Close(n);
+        }
+        (void)sx; (void)sy;
+        if (!n) return;
+        FS_MATRIX m{}; FPDFPageObj_GetMatrix(o, &m); FPDFPageObj_SetMatrix(n, &m);
+        unsigned int R = 0, G = 0, B = 0, A = 255; if (FPDFPageObj_GetFillColor(o, &R, &G, &B, &A)) FPDFPageObj_SetFillColor(n, R, G, B, A);
+        if (FPDFPageObj_GetStrokeColor(o, &R, &G, &B, &A)) FPDFPageObj_SetStrokeColor(n, R, G, B, A);
+        float sw = 1; if (FPDFPageObj_GetStrokeWidth(o, &sw)) FPDFPageObj_SetStrokeWidth(n, sw);
+        int fill = 0; FPDF_BOOL stroke = 0; if (FPDFPath_GetDrawMode(o, &fill, &stroke)) FPDFPath_SetDrawMode(n, fill, stroke);
+        FPDFPageObj_Transform(n, 1, 0, 0, 1, dx, dy);
+    } else { lastNote = "unsupported"; return; }
     whiteout(page, e.rect); for (int mi : e.members) hidden[page].insert(mi);
     FPDFPage_InsertObject(p, n); FPDFPage_GenerateContent(p); dirty = true; dirtyPages.insert(page);
 }

@@ -43,6 +43,9 @@ fn j<T: serde::Serialize>(t: T) -> Result<serde_json::Value, String> { serde_jso
         Ok(serde_json::json!({ "metadata": m }))
     })())
 }
+#[unsafe(no_mangle)] pub extern "C" fn pdfcore_write_docx(doc_json: *const c_char, out_path: *const c_char) -> *mut c_char {
+    out((|| { let d: pdfcore::docx::Doc = serde_json::from_str(&arg(doc_json)).map_err(|e| format!("docx json: {e}"))?; pdfcore::docx::write(&d, std::path::Path::new(&arg(out_path)))?; Ok(serde_json::json!({ "path": arg(out_path) })) })())
+}
 #[unsafe(no_mangle)] pub extern "C" fn pdfcore_new_guid() -> *mut c_char { out(Ok(serde_json::json!({ "guid": pdfcore::labels::new_guid() }))) }
 /// action: "register" (items_json = [{"action","label"}]), "unregister", "status"
 #[unsafe(no_mangle)] pub extern "C" fn pdfcore_shell(action: *const c_char, items_json: *const c_char) -> *mut c_char {

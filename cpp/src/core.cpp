@@ -32,6 +32,7 @@ QJsonObject msipMetadata(const QJsonObject& label, const QString& siteId, unsign
     const QByteArray l = js(label), p = js(previous);
     return parse(pdfcore_msip_metadata(l.constData(), u8(siteId).constData(), bits, u8(owner).constData(), p.constData()));
 }
+QJsonObject writeDocx(const QJsonObject& doc, const QString& outPath) { const QByteArray j = js(doc); return parse(pdfcore_write_docx(j.constData(), u8(outPath).constData())); }
 QString newGuid() { return parse(pdfcore_new_guid()).value("guid").toString(); }
 QJsonObject shell(const QString& action, const QJsonArray& items) { const QByteArray i = js(items); return parse(pdfcore_shell(u8(action).constData(), i.constData())); }
 

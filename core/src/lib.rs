@@ -1,5 +1,6 @@
 //! PDF DLP core: PDF operations (lopdf), MSIP-compatible labels, Windows shell integration.
 //! Shared by the Tauri app (src-tauri) and the C ABI (core-ffi) used by the Qt/C++ app.
+pub mod docx;
 pub mod labels;
 pub mod pdfops;
 pub mod winshell;

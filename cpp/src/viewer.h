@@ -46,6 +46,9 @@ public:
     void setEditSession(EditSession* s);
     void refreshPage(int page); void refreshAllPages();
     void deleteSelected();
+    void openInlineEditor(PageWidget* pw, QPointF viewerPt, int objIndex, const QString& text, double fontSizePt, QRectF rectPt);
+    void commitInlineEditor(bool accept);
+    QTextEdit* inlineEdit = nullptr; int inlinePage = -1; int inlineObj = -1; QPointF inlinePt;
     bool hasSelection() const;
     int formPage = -1; // page with a focused form field
     // search highlights
@@ -53,8 +56,8 @@ public:
     void setSearchHits(const QList<PdfDoc::SearchHit>& h, int current); void gotoHit(int i);
 signals:
     void zoomChanged(double); void pageChanged(int, int);
-    void textRequested(int page, QPointF viewerPt);
-    void editTextRequested(int page, int objIndex, QString current);
+    void textCommitted(int page, QPointF viewerPt, QString text);
+    void textEdited(int page, int objIndex, QString text);
     void imageRectDrawn(int page, QRectF viewerRect);
     void fieldRectDrawn(int page, QRectF viewerRect, bool checkbox);
     void selectionChanged();

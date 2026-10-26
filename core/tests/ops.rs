@@ -154,3 +154,15 @@ fn add_form_fields() {
     let j = Command::new("qpdf").args(["--json", "--json-key=acroform"]).arg(&o).output().unwrap();
     let s = String::from_utf8_lossy(&j.stdout); assert!(s.contains("fullname") && s.contains("agree"), "{s}");
 }
+
+#[test]
+fn docx_writer() {
+    let j = r##"{"pages":[{"width":595.3,"height":841.9,"blocks":[{"type":"p","runs":[{"text":"บริษัท วันเอเบิล","size":22,"bold":true}],"align":"left"},{"type":"p","runs":[{"text":"Hello world","size":12,"color":"#c62828"}]}]},{"width":595.3,"height":841.9,"blocks":[{"type":"p","runs":[{"text":"Page 2","size":14}]}]}]}"##;
+    let d: pdfcore::docx::Doc = serde_json::from_str(j).unwrap();
+    let o = out("test.docx"); pdfcore::docx::write(&d, &o).unwrap();
+    let f = std::fs::File::open(&o).unwrap(); let mut z = zip::ZipArchive::new(f).unwrap();
+    let mut s = String::new(); use std::io::Read; z.by_name("word/document.xml").unwrap().read_to_string(&mut s).unwrap();
+    assert!(s.contains("Hello world") && s.contains("<w:b/>") && s.contains("w:type=\"page\""));
+    // macOS textutil reads Word files: round-trip to text
+    if let Ok(t) = Command::new("textutil").args(["-convert", "txt", "-stdout"]).arg(&o).output() { let txt = String::from_utf8_lossy(&t.stdout); assert!(txt.contains("Hello world"), "{txt}"); }
+}

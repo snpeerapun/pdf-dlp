@@ -1,6 +1,7 @@
 #include "viewer.h"
 #include <QtConcurrent>
 #include <fpdf_fwlevent.h>
+#include <QTextEdit>
 
 static QThreadPool& renderPool() { static QThreadPool p; p.setMaxThreadCount(2); return p; }
 static const int PAD = 22, GAP = 18;
@@ -70,7 +71,7 @@ void PageWidget::mousePressEvent(QMouseEvent* e) {
         if (s->hasFieldAt(idx, v)) { s->formMouse(idx, v, true); s->formMouse(idx, v, false); viewer->formPage = idx; selected = -1; invalidate(); emit viewer->selectionChanged(); return; }
         viewer->formPage = -1;
         const EditObject* o = at(v); selected = o ? o->index : -1; dragging = o != nullptr; dragStart = dragCur = v; update(); emit viewer->selectionChanged(); break; }
-    case EditTool::Text: emit viewer->textRequested(idx, v); break;
+    case EditTool::Text: viewer->openInlineEditor(this, v, -1, QString(), viewer->edit.fontSize, QRectF(v, QSizeF(std::max(160.0, width() / scale * 0.45), viewer->edit.fontSize * 1.6))); break;
     default: rubber = true; dragStart = dragCur = v; update(); break;
     }
 }
@@ -101,7 +102,7 @@ void PageWidget::mouseReleaseEvent(QMouseEvent* e) {
 void PageWidget::mouseDoubleClickEvent(QMouseEvent* e) {
     if (!viewer->edit.session) { QWidget::mouseDoubleClickEvent(e); return; }
     const EditObject* o = at(vp(e->pos()));
-    if (o && o->type == FPDF_PAGEOBJ_TEXT) emit viewer->editTextRequested(idx, o->index, o->text);
+    if (o && o->type == FPDF_PAGEOBJ_TEXT) viewer->openInlineEditor(this, o->rect.topLeft(), o->index, o->text, std::max(6.0, double(o->rect.height()) * 0.8), o->rect.adjusted(-2, -2, 40, 2));
 }
 void PageWidget::leaveEvent(QEvent*) { if (hover >= 0) { hover = -1; update(); } }
 
@@ -147,7 +148,40 @@ void Viewer::gotoHit(int i) {
     const double y = pw->geometry().top() + h.rects.first().top() * sc - viewport()->height() * 0.35;
     verticalScrollBar()->setValue(int(std::max(0.0, y))); for (auto* p : pages) p->update(); wantTimer.start();
 }
-void Viewer::setEditSession(EditSession* s) { edit.session = s; formPage = -1; for (auto* p : pages) { p->selected = -1; p->invalidate(); } emit selectionChanged(); }
+// Inline text box drawn over the page: Esc = cancel, Cmd/Ctrl+Enter or click elsewhere = commit, Enter = new line.
+class InlineEdit : public QTextEdit {
+public:
+    Viewer* v; explicit InlineEdit(Viewer* viewer, QWidget* parent) : QTextEdit(parent), v(viewer) {}
+protected:
+    void keyPressEvent(QKeyEvent* e) override {
+        if (e->key() == Qt::Key_Escape) { v->commitInlineEditor(false); return; }
+        if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) && (e->modifiers() & (Qt::ControlModifier | Qt::MetaModifier))) { v->commitInlineEditor(true); return; }
+        QTextEdit::keyPressEvent(e);
+    }
+    void focusOutEvent(QFocusEvent* e) override { QTextEdit::focusOutEvent(e); QTimer::singleShot(0, v, [this]() { if (v->inlineEdit == this) v->commitInlineEditor(true); }); }
+};
+void Viewer::openInlineEditor(PageWidget* pw, QPointF v, int objIndex, const QString& text, double fontPt, QRectF rectPt) {
+    commitInlineEditor(true);
+    auto* te = new InlineEdit(this, pw); inlineEdit = te; inlinePage = pw->index(); inlineObj = objIndex; inlinePt = v;
+    const double s = sc; QFont f(edit.font.isEmpty() ? QStringLiteral("Noto Sans Thai") : edit.font.split(' ').first()); f.setPixelSize(std::max(8, int(fontPt * s)));
+    te->setFont(f); te->setPlainText(text); te->setAcceptRichText(false); te->setFrameShape(QFrame::Box);
+    te->setStyleSheet(QString("QTextEdit{background:rgba(255,255,255,0.96);border:1.5px solid #4f8cff;border-radius:3px;color:%1;padding:1px;}").arg(edit.color.name()));
+    te->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff); te->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    const QRect r(int(rectPt.left() * s), int(rectPt.top() * s), int(std::max(rectPt.width(), 120.0) * s), int(std::max(rectPt.height(), fontPt * 1.6) * s) + 6);
+    te->setGeometry(r); te->show(); te->setFocus(); te->moveCursor(QTextCursor::End);
+    // grow with content
+    connect(te->document(), &QTextDocument::contentsChanged, te, [te, r]() { const int h = int(te->document()->size().height()) + 8; te->setFixedHeight(std::max(r.height(), h)); });
+}
+void Viewer::commitInlineEditor(bool accept) {
+    if (!inlineEdit) return;
+    QTextEdit* te = inlineEdit; inlineEdit = nullptr;
+    const QString text = te->toPlainText(); const int page = inlinePage, obj = inlineObj; const QPointF pt = inlinePt;
+    te->deleteLater();
+    if (!accept || !edit.session) return;
+    if (obj >= 0) { if (!text.trimmed().isEmpty()) emit textEdited(page, obj, text); }
+    else if (!text.trimmed().isEmpty()) emit textCommitted(page, QPointF(pt.x(), pt.y() + edit.fontSize), text); // baseline below the click point
+}
+void Viewer::setEditSession(EditSession* s) { commitInlineEditor(false); edit.session = s; formPage = -1; for (auto* p : pages) { p->selected = -1; p->invalidate(); } emit selectionChanged(); }
 void Viewer::refreshPage(int page) { if (page >= 0 && page < int(pages.size())) pages[page]->invalidate(); }
 void Viewer::refreshAllPages() { for (auto* p : pages) p->invalidate(); }
 bool Viewer::hasSelection() const { for (auto* p : pages) if (p->selected >= 0) return true; return false; }
@@ -164,10 +198,10 @@ void Viewer::relayout() {
 void Viewer::updateWanted() {
     if (!doc) return;
     const QRect vis(QPoint(0, verticalScrollBar()->value()), viewport()->size());
-    const QRect near = vis.adjusted(0, -900, 0, 900);
+    const QRect nearRect = vis.adjusted(0, -900, 0, 900);
     int best = 0, bestD = INT_MAX;
     for (auto* p : pages) { const int d = std::abs(p->geometry().top() - (vis.top() + vis.height() / 3)); if (d < bestD) { bestD = d; best = p->index(); } }
-    for (auto* p : pages) { p->wanted = p->geometry().intersects(near); p->distance = std::abs(p->index() - best); if (p->wanted) p->update(); }
+    for (auto* p : pages) { p->wanted = p->geometry().intersects(nearRect); p->distance = std::abs(p->index() - best); if (p->wanted) p->update(); }
     cur = best; emit pageChanged(cur + 1, int(pages.size()));
 }
 void Viewer::zoomTo(double s) { zoomAt(QPointF(viewport()->width() / 2.0, viewport()->height() / 2.0), s); }

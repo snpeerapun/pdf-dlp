@@ -23,6 +23,7 @@ static void parseArgs(const QStringList& args, QString& action, QStringList& pat
 #include "core.h"
 #include "stamps.h"
 #include "edit.h"
+#include "docx.h"
 // Headless end-to-end check of the C++ ↔ Rust core ↔ PDFium chain: --selftest <fixture.pdf> <outdir>
 static int selfTest(const QString& fixture, const QString& outDir) {
     int fails = 0; auto step = [&](const QString& name, std::function<QString()> fn) { QElapsedTimer t; t.start(); QString d; bool ok = true; try { d = fn(); } catch (const std::exception& e) { ok = false; d = e.what(); } if (d.startsWith("FAIL")) ok = false; if (!ok) fails++; fprintf(stdout, "%s %s (%lld ms) %s\n", ok ? "OK  " : "FAIL", qPrintable(name), (long long)t.elapsed(), qPrintable(d)); };
@@ -56,6 +57,7 @@ static int selfTest(const QString& fixture, const QString& outDir) {
         return QString("objects %1->%2, field ok pages=%3").arg(before).arg(after).arg(r.value("pages").toInt());
     });
     step("search text (EN + TH)", [&]() { bool n; auto d = PdfDoc::open(fixture, "", &n); if (!d) return QString("FAIL open"); const auto a = d->search("Payment"); const auto b = d->search(QString::fromUtf8("เงินเดือน")); const auto c = d->search("4111"); if (a.isEmpty() || c.isEmpty()) return QString("FAIL en=%1 th=%2 num=%3").arg(a.size()).arg(b.size()).arg(c.size()); return QString("en=%1 (page %2) th=%3 num=%4").arg(a.size()).arg(a.first().page + 1).arg(b.size()).arg(c.size()); });
+    step("pdf -> docx", [&]() { bool n; auto d = PdfDoc::open(fixture, "", &n); if (!d) return QString("FAIL open"); EditSession es(fixture, "", {}); const QJsonObject j = DocxExport::extract(*d, es.ok() ? &es : nullptr); const QString o = outDir + "/selftest.docx"; const QJsonObject r = req(Core::writeDocx(j, o)); QProcess p; p.start("textutil", {"-convert", "txt", "-stdout", o}); p.waitForFinished(15000); const QString t = QString::fromUtf8(p.readAllStandardOutput()); if (p.exitCode() == 0 && !t.contains("Payment")) return QString("FAIL text: ") + t.left(120); return QString("pages=%1 blocks_p1=%2 textutil=%3").arg(j.value("pages").toArray().size()).arg(j.value("pages").toArray().first().toObject().value("blocks").toArray().size()).arg(p.exitCode() == 0 ? "ok" : "n/a"); });
     step("merge", [&]() { auto r = req(Core::merge(QJsonArray{QJsonObject{{"path", work}}, QJsonObject{{"path", fixture}, {"pages", QJsonArray{1}}}})); return r.value("pages").toInt() == 3 ? QString("pages=3") : QString("FAIL pages=%1").arg(r.value("pages").toInt()); });
     step("split each", [&]() { auto r = req(Core::split(fixture, "", "each", "", 1, outDir)); return QString("files=%1").arg(r.value("files").toArray().size()); });
     step("images->pdf", [&]() { QImage img(300, 200, QImage::Format_RGB32); img.fill(QColor("#4f8cff")); img.save(outDir + "/st.png"); auto r = req(Core::imagesToPdf({outDir + "/st.png"}, true)); return QString("pages=%1").arg(r.value("pages").toInt()); });

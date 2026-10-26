@@ -15,6 +15,7 @@ char* pdfcore_parse_ranges(const char* spec, uint32_t total);
 char* pdfcore_discover_labels(void);
 char* pdfcore_labels_from_file(const char* path, const char* password);
 char* pdfcore_msip_metadata(const char* label_json, const char* site_id, uint32_t content_bits, const char* owner, const char* previous_json);
+char* pdfcore_write_docx(const char* doc_json, const char* out_path);
 char* pdfcore_new_guid(void);
 char* pdfcore_shell(const char* action, const char* items_json);
 #ifdef __cplusplus

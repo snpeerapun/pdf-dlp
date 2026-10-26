@@ -7,6 +7,7 @@
 #include "i18n.h"
 #include "stamps.h"
 #include "present.h"
+#include "docx.h"
 #include "dialogs.h"
 
 static const QColor kBlue("#4f8cff");
@@ -112,7 +113,7 @@ void MainWindow::retranslate() {
     modifiedBadge->setText(TXT("modified")); rightTabs->setTabText(0, TXT("classify")); rightTabs->setTabText(1, TXT("info"));
     rightTabs->setTabIcon(0, FA::icon(FA::Tag, QColor("#f4a33f"), 14)); rightTabs->setTabIcon(1, FA::icon(FA::Info, QColor("#34c77b"), 14));
     for (int i = 0; i < toolActs.size(); i++) toolActs[i]->setText(TXT(toolDefs()[i].label));
-    { const char* keys[] = {"etSelect", "etText", "etImage", "etLine", "etRect", "etField", "etCheckbox"}; for (int i = 0; i < editToolActs.size() && i < 7; i++) editToolActs[i]->setText(TXT(keys[i])); if (delAct) delAct->setText(TXT("deleteObject")); if (fillChk) fillChk->setText(TXT("fill")); if (auto* b = editbar ? editbar->findChild<QPushButton*>("editCancel") : nullptr) b->setText(TXT("cancelEdit")); if (auto* b = editbar ? editbar->findChild<QPushButton*>("primary") : nullptr) b->setText(TXT("finishEdit")); }
+    { const char* keys[] = {"etSelect", "etText", "etImage", "etLine", "etRect", "etField", "etCheckbox"}; for (int i = 0; i < editToolActs.size() && i < 7; i++) { editToolActs[i]->setText(TXT(keys[i])); editToolActs[i]->setToolTip(TXT(keys[i])); } if (delAct) delAct->setText(TXT("deleteObject")); if (fillChk) fillChk->setText(TXT("fill")); if (auto* b = editbar ? editbar->findChild<QPushButton*>("editCancel") : nullptr) b->setText(TXT("cancelEdit")); if (auto* b = editbar ? editbar->findChild<QPushButton*>("primary") : nullptr) b->setText(TXT("finishEdit")); }
     home->retranslate();
     sidebar->retranslate(); classify->retranslate(); refreshAll();
 }
@@ -238,6 +239,11 @@ void MainWindow::tool(const QString& key) {
     else if (key == "email") emailDoc();
     else if (key == "edit") enterEdit();
     else if (key == "search") showSearch();
+    else if (key == "docx") {
+        const QString dest = QFileDialog::getSaveFileName(this, TXT("toWord"), QFileInfo(d->path.contains('/') ? d->path : QDir::homePath() + "/" + d->name).path() + "/" + QFileInfo(d->name).completeBaseName() + ".docx", "Word (*.docx)"); if (dest.isEmpty()) return;
+        setBusy(TXT("toWord")); EditSession es(d->workPath, d->password, editFonts()); const QJsonObject j = DocxExport::extract(*d->pdf, es.ok() ? &es : nullptr); const QJsonObject r = Core::writeDocx(j, dest); setBusy("");
+        if (r.value("ok").toBool()) { toast(QString("%1: %2").arg(TXT("wordSaved"), QFileInfo(dest).fileName())); QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(dest).absolutePath())); } else toast(r.value("error").toString(), "err");
+    }
     else if (key == "present") present();
 }
 
@@ -299,41 +305,31 @@ QList<QPair<QString, QByteArray>> MainWindow::editFonts() {
     return out;
 }
 void MainWindow::buildEditBar() {
-    editbar = new QToolBar; editbar->setObjectName("editbar"); editbar->setMovable(false); editbar->setIconSize(QSize(15, 15)); editbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    editbar = new QToolBar; editbar->setObjectName("editbar"); editbar->setMovable(false); editbar->setIconSize(QSize(16, 16)); editbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     editTools = new QActionGroup(this); editTools->setExclusive(true);
     struct T { EditTool t; ushort icon; const char* key; };
     const T defs[] = {{EditTool::Select, FA::ArrowPointer, "etSelect"}, {EditTool::Text, FA::Font, "etText"}, {EditTool::Image, FA::Image, "etImage"}, {EditTool::Line, FA::Slash, "etLine"}, {EditTool::Rect, FA::Square, "etRect"}, {EditTool::TextField, FA::ICursor, "etField"}, {EditTool::Checkbox, FA::SquareCheck, "etCheckbox"}};
-    for (const T& d : defs) { QAction* a = editbar->addAction(FA::icon(d.icon, QColor("#c62828"), 15), TXT(d.key)); a->setCheckable(true); a->setData(int(d.t)); editTools->addAction(a); editToolActs << a; const EditTool t = d.t; connect(a, &QAction::triggered, this, [this, t]() { viewer->edit.tool = t; }); }
+    for (const T& d : defs) { QAction* a = editbar->addAction(FA::icon(d.icon, QColor("#c62828"), 16), TXT(d.key)); a->setToolTip(TXT(d.key)); a->setCheckable(true); a->setData(int(d.t)); editTools->addAction(a); editToolActs << a; const EditTool t = d.t; connect(a, &QAction::triggered, this, [this, t]() { viewer->edit.tool = t; }); }
     editToolActs.first()->setChecked(true);
     editbar->addSeparator();
-    fontBox = new QComboBox; fontBox->setMinimumWidth(150); editbar->addWidget(fontBox); connect(fontBox, &QComboBox::currentTextChanged, this, [this](const QString& f) { viewer->edit.font = f; });
-    sizeBox = new QDoubleSpinBox; sizeBox->setRange(4, 200); sizeBox->setValue(14); sizeBox->setDecimals(0); sizeBox->setSuffix(" pt"); sizeBox->setFixedWidth(70); editbar->addWidget(sizeBox); connect(sizeBox, &QDoubleSpinBox::valueChanged, this, [this](double v) { viewer->edit.fontSize = v; });
+    fontBox = new QComboBox; fontBox->setMinimumWidth(120); fontBox->setMaximumWidth(150); editbar->addWidget(fontBox); connect(fontBox, &QComboBox::currentTextChanged, this, [this](const QString& f) { viewer->edit.font = f; });
+    sizeBox = new QDoubleSpinBox; sizeBox->setRange(4, 200); sizeBox->setValue(14); sizeBox->setDecimals(0); sizeBox->setSuffix(" pt"); sizeBox->setFixedWidth(64); editbar->addWidget(sizeBox); connect(sizeBox, &QDoubleSpinBox::valueChanged, this, [this](double v) { viewer->edit.fontSize = v; });
     colorBtn = new QPushButton; colorBtn->setFixedSize(26, 26); colorBtn->setToolTip(TXT("color")); editbar->addWidget(colorBtn);
     auto paintBtn = [](QPushButton* b, const QColor& c) { b->setStyleSheet(QString("background:%1;border:1px solid #c5cfdc;border-radius:6px;").arg(c.name())); };
     paintBtn(colorBtn, viewer->edit.color);
     connect(colorBtn, &QPushButton::clicked, this, [this, paintBtn]() { const QColor c = QColorDialog::getColor(viewer->edit.color, this); if (c.isValid()) { viewer->edit.color = c; viewer->edit.strokeColor = c; paintBtn(colorBtn, c); } });
-    strokeBox = new QDoubleSpinBox; strokeBox->setRange(0.2, 30); strokeBox->setValue(1.5); strokeBox->setDecimals(1); strokeBox->setSuffix(" px"); strokeBox->setFixedWidth(70); strokeBox->setToolTip(TXT("strokeWidth")); editbar->addWidget(strokeBox); connect(strokeBox, &QDoubleSpinBox::valueChanged, this, [this](double v) { viewer->edit.stroke = v; });
+    strokeBox = new QDoubleSpinBox; strokeBox->setRange(0.2, 30); strokeBox->setValue(1.5); strokeBox->setDecimals(1); strokeBox->setSuffix(" px"); strokeBox->setFixedWidth(62); strokeBox->setToolTip(TXT("strokeWidth")); editbar->addWidget(strokeBox); connect(strokeBox, &QDoubleSpinBox::valueChanged, this, [this](double v) { viewer->edit.stroke = v; });
     fillChk = new QCheckBox(TXT("fill")); editbar->addWidget(fillChk); connect(fillChk, &QCheckBox::toggled, this, [this](bool on) { viewer->edit.filled = on; });
     fillBtn = new QPushButton; fillBtn->setFixedSize(26, 26); fillBtn->setToolTip(TXT("fillColor")); editbar->addWidget(fillBtn); paintBtn(fillBtn, viewer->edit.fill);
     connect(fillBtn, &QPushButton::clicked, this, [this, paintBtn]() { const QColor c = QColorDialog::getColor(viewer->edit.fill, this, QString(), QColorDialog::ShowAlphaChannel); if (c.isValid()) { viewer->edit.fill = c; paintBtn(fillBtn, c); } });
     editbar->addSeparator();
-    delAct = editbar->addAction(FA::icon(FA::TrashCan, QColor("#e5484d"), 15), TXT("deleteObject")); delAct->setEnabled(false); connect(delAct, &QAction::triggered, this, [this]() { viewer->deleteSelected(); });
+    delAct = editbar->addAction(FA::icon(FA::TrashCan, QColor("#e5484d"), 16), TXT("deleteObject")); delAct->setToolTip(TXT("deleteObject")); delAct->setEnabled(false); connect(delAct, &QAction::triggered, this, [this]() { viewer->deleteSelected(); });
     auto* sp = new QWidget; sp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); editbar->addWidget(sp);
     auto* cancel = new QPushButton(TXT("cancelEdit")); cancel->setObjectName("editCancel"); editbar->addWidget(cancel); connect(cancel, &QPushButton::clicked, this, [this]() { finishEdit(false); });
-    auto* done = new QPushButton(TXT("finishEdit")); done->setObjectName("primary"); done->setIcon(FA::icon(FA::CheckCircle, Qt::white, 14)); editbar->addWidget(done); connect(done, &QPushButton::clicked, this, [this]() { finishEdit(true); });
+    auto* done = new QPushButton(TXT("finishEdit")); done->setObjectName("primary"); done->setIcon(FA::icon(FA::Save, Qt::white, 14)); editbar->addWidget(done); connect(done, &QPushButton::clicked, this, [this]() { finishEdit(true); });
     connect(viewer, &Viewer::selectionChanged, this, [this]() { delAct->setEnabled(viewer->hasSelection()); });
-    connect(viewer, &Viewer::textRequested, this, [this](int page, QPointF pt) {
-        if (!session) return;
-        auto* d = Dialogs::make(this, TXT("etText"), 460); auto* te = new QTextEdit; te->setMinimumHeight(90); static_cast<QVBoxLayout*>(d->layout())->addWidget(te); auto* ok = Dialogs::primary(TXT("ok")); auto* row = new QHBoxLayout; row->addStretch(); row->addWidget(ok); static_cast<QVBoxLayout*>(d->layout())->addLayout(row); connect(ok, &QPushButton::clicked, d, &QDialog::accept); te->setFocus();
-        if (d->exec() == QDialog::Accepted && !te->toPlainText().trimmed().isEmpty()) { session->addText(page, pt, te->toPlainText(), viewer->edit.fontSize, viewer->edit.color, viewer->edit.font); viewer->refreshPage(page); }
-        d->deleteLater();
-    });
-    connect(viewer, &Viewer::editTextRequested, this, [this](int page, int obj, QString cur) {
-        if (!session) return;
-        auto* d = Dialogs::make(this, TXT("editText"), 460); auto* te = new QTextEdit(cur); te->setMinimumHeight(90); static_cast<QVBoxLayout*>(d->layout())->addWidget(te); auto* hint = new QLabel(TXT("editTextHint")); hint->setObjectName("hint"); hint->setWordWrap(true); static_cast<QVBoxLayout*>(d->layout())->addWidget(hint); auto* ok = Dialogs::primary(TXT("ok")); auto* row = new QHBoxLayout; row->addStretch(); row->addWidget(ok); static_cast<QVBoxLayout*>(d->layout())->addLayout(row); connect(ok, &QPushButton::clicked, d, &QDialog::accept); te->setFocus(); te->selectAll();
-        if (d->exec() == QDialog::Accepted && te->toPlainText() != cur) { session->setText(page, obj, te->toPlainText(), viewer->edit.font); viewer->refreshPage(page); }
-        d->deleteLater();
-    });
+    connect(viewer, &Viewer::textCommitted, this, [this](int page, QPointF pt, QString text) { if (!session) return; session->addText(page, pt, text, viewer->edit.fontSize, viewer->edit.color, viewer->edit.font); viewer->refreshPage(page); });
+    connect(viewer, &Viewer::textEdited, this, [this](int page, int obj, QString text) { if (!session) return; session->setText(page, obj, text, viewer->edit.font); viewer->refreshPage(page); });
     connect(viewer, &Viewer::imageRectDrawn, this, [this](int page, QRectF r) {
         if (!session) return; const QString f = QFileDialog::getOpenFileName(this, TXT("image"), QString(), "Images (*.png *.jpg *.jpeg *.webp)"); if (f.isEmpty()) return;
         QImage img(f); if (img.isNull()) return; const double ar = double(img.height()) / img.width(); QRectF rr(r.topLeft(), QSizeF(r.width(), r.width() * ar)); session->addImage(page, rr, img); viewer->refreshPage(page);
@@ -400,7 +396,8 @@ void MainWindow::finishEdit(bool save) {
             if (!pendingFieldOps.isEmpty()) { const QJsonObject r = Core::apply(tmp, pw, pendingFieldOps); if (r.value("ok").toBool()) out = r.value("path").toString(); else { const QJsonObject r2 = Core::apply(tmp, "", pendingFieldOps); if (r2.value("ok").toBool()) { out = r2.value("path").toString(); pw = ""; } else toast(r.value("error").toString(), "err"); } }
             viewer->setEditSession(nullptr); session.reset();
             bool needs = false; auto test = PdfDoc::open(out, pw, &needs); if (!test && needs) pw = "";
-            reloadActive(out, pw, true); toast(TXT("editSaved"));
+            reloadActive(out, pw, true);
+            Document* x = active(); if (x && writeBack(*x)) { refreshAll(); toast(TXT("editWritten")); } else toast(TXT("editSaved"));
         }
     }
     viewer->setEditSession(nullptr); session.reset(); pendingFieldOps = QJsonArray();
