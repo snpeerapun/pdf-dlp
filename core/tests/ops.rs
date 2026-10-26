@@ -139,3 +139,18 @@ fn images_to_pdf_builds_pages() {
     let o = out("images.pdf"); pdfops::save(&mut d, &o).unwrap();
     assert_eq!(pages(&o, ""), 2); assert!(qpdf_ok(&o));
 }
+
+#[test]
+fn add_form_fields() {
+    let mut d = pdfops::load(&fx("public-brochure.pdf"), "").unwrap();
+    pdfops::apply(&mut d, &[
+        Op::AddField { page: 1, kind: "text".into(), name: "fullname".into(), x: 0.1, y: 0.5, w: 0.5, h: 0.04, value: "Somchai".into(), font_size: 0.0 },
+        Op::AddField { page: 1, kind: "checkbox".into(), name: "agree".into(), x: 0.1, y: 0.6, w: 0.03, h: 0.03, value: "true".into(), font_size: 0.0 },
+    ]).unwrap();
+    let o = out("fields.pdf"); pdfops::save(&mut d, &o).unwrap();
+    assert!(qpdf_ok(&o));
+    let fields = Command::new("qpdf").args(["--show-npages"]).arg(&o).output().unwrap(); assert!(fields.status.success());
+    // poppler's pdfinfo -? reports form type; use mutool/qpdf json to count annots
+    let j = Command::new("qpdf").args(["--json", "--json-key=acroform"]).arg(&o).output().unwrap();
+    let s = String::from_utf8_lossy(&j.stdout); assert!(s.contains("fullname") && s.contains("agree"), "{s}");
+}

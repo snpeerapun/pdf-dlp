@@ -16,12 +16,13 @@ public:
     /// Build ops for applying `label` with current marking prefs. encryptPassword used only when "encrypt" checked.
     QJsonArray buildOps(const QJsonObject& label, const QJsonObject& previousMeta, QString* nextPassword) const;
     QJsonArray buildRemoveOps(const QJsonObject& previousMeta) const;
+    bool autoSave() const;
 signals:
     void applyRequested(); void removeRequested(); void batchRequested();
 private:
     void load(); void save(); void refreshList(); void mergeLabels(const QJsonArray& add);
     QJsonArray m_labels; QListWidget* list; QLabel* current; QLabel* msipBadge; QLabel* marksBadge; QPushButton* removeBtn; QPushButton* applyBtn; QPushButton* batchBtn;
-    QCheckBox *cbHeader, *cbFooter, *cbWatermark, *cbMsip, *cbEncrypt; QLineEdit* siteId; QLineEdit* encPw; QLabel* notes; QPushButton *readWinBtn, *learnBtn, *addBtn;
+    QCheckBox *cbHeader, *cbFooter, *cbWatermark, *cbMsip, *cbEncrypt, *cbAutoSave; QLineEdit* siteId; QLineEdit* encPw; QLabel* notes; QPushButton *readWinBtn, *learnBtn, *addBtn;
     QGroupBox *gCur, *gChoose, *gMark;
 };
 

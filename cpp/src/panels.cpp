@@ -13,7 +13,7 @@ const QList<ToolDef>& toolDefs() {
         {"rotateL", "rotateL", FA::RotateLeft, "#4f8cff", 1}, {"rotate", "rotateR", FA::RotateRight, "#4f8cff", 1}, {"delete", "deletePages", FA::Trash, "#e5484d", 1}, {"extract", "extract", FA::FileExport, "#4f8cff", 1}, {"crop", "crop", FA::Crop, "#4f8cff", 1},
         {"encrypt", "encrypt", FA::Lock, "#34c77b", 2}, {"decrypt", "decrypt", FA::LockOpen, "#34c77b", 2}, {"redact", "redact", FA::Marker, "#e5484d", 2}, {"sanitize", "sanitize", FA::Broom, "#34c77b", 2},
         {"watermark", "watermark", FA::Droplet, "#f4a33f", 3}, {"pagenum", "pageNumbers", FA::ListOl, "#f4a33f", 3}, {"props", "properties", FA::PenToSquare, "#f4a33f", 3},
-        {"images", "exportImages", FA::Images, "#14b8a6", 4}, {"img2pdf", "images2pdf", FA::FileImage, "#14b8a6", 4}, {"compress", "compress", FA::Compress, "#14b8a6", 4}, {"print", "print", FA::Print, "#6f7a89", 5}, {"email", "email", FA::Envelope, "#4f8cff", 5},
+        {"images", "exportImages", FA::Images, "#14b8a6", 4}, {"img2pdf", "images2pdf", FA::FileImage, "#14b8a6", 4}, {"compress", "compress", FA::Compress, "#14b8a6", 4}, {"edit", "editMode", FA::Pen, "#e5484d", 5}, {"present", "present", FA::Play, "#7b5cff", 5}, {"print", "print", FA::Print, "#6f7a89", 5}, {"email", "email", FA::Envelope, "#4f8cff", 5},
     };
     return d;
 }
@@ -33,6 +33,7 @@ ClassifyPanel::ClassifyPanel(QWidget* parent) : QScrollArea(parent) {
     cbHeader = new QCheckBox; cbFooter = new QCheckBox; cbWatermark = new QCheckBox; cbMsip = new QCheckBox; cbEncrypt = new QCheckBox; for (auto* c : {cbHeader, cbFooter, cbWatermark, cbMsip, cbEncrypt}) c->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); siteId = new QLineEdit; siteId->setPlaceholderText("Tenant ID"); siteId->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); encPw = new QLineEdit; encPw->setEchoMode(QLineEdit::Password); encPw->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     for (auto* c : {cbHeader, cbFooter, cbWatermark, cbMsip, cbEncrypt}) mv->addWidget(c);
     mv->addWidget(siteId); mv->addWidget(encPw);
+    cbAutoSave = new QCheckBox; cbAutoSave->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); cbAutoSave->setChecked(QSettings().value("mark/autosave", true).toBool()); mv->addWidget(cbAutoSave); connect(cbAutoSave, &QCheckBox::toggled, this, [](bool on) { QSettings().setValue("mark/autosave", on); });
     applyBtn = new QPushButton; applyBtn->setObjectName("primary"); applyBtn->setIcon(FA::icon(FA::Tag, Qt::white, 14)); applyBtn->setMinimumHeight(34); applyBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); batchBtn = new QPushButton; batchBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); batchBtn->setIcon(FA::icon(FA::Layers, QColor("#4f8cff"), 14)); mv->addWidget(applyBtn); mv->addWidget(batchBtn);
     v->addWidget(gMark);
     load(); refreshList(); retranslate();
@@ -72,7 +73,7 @@ ClassifyPanel::ClassifyPanel(QWidget* parent) : QScrollArea(parent) {
 void ClassifyPanel::retranslate() {
     gCur->setTitle(TXT("currentLabel")); gChoose->setTitle(TXT("chooseLabel")); gMark->setTitle(TXT("marking")); removeBtn->setText(TXT("removeLabel")); readWinBtn->setText(TXT("readFromWindows")); learnBtn->setText(TXT("learnFromFile")); addBtn->setText(TXT("addManual"));
     cbHeader->setText(TXT("markHeader")); cbFooter->setText(TXT("markFooter")); cbWatermark->setText(TXT("markWatermark")); cbMsip->setText(TXT("msipWrite")); cbEncrypt->setText(TXT("markEncrypt")); siteId->setToolTip(TXT("siteId")); encPw->setPlaceholderText(TXT("password"));
-    applyBtn->setText(TXT("applyLabel")); batchBtn->setText(TXT("batch")); batchBtn->setToolTip(TXT("batchHint")); marksBadge->setText(TXT("marks"));
+    applyBtn->setText(TXT("applyLabel")); batchBtn->setText(TXT("batch")); cbAutoSave->setText(TXT("autoSaveLabel")); cbAutoSave->setToolTip(TXT("autoSaveHint")); batchBtn->setToolTip(TXT("batchHint")); marksBadge->setText(TXT("marks"));
     if (m_labels.isEmpty()) notes->setText(TXT("noLabels"));
 }
 void ClassifyPanel::load() { QSettings s; m_labels = QJsonDocument::fromJson(s.value("labels").toByteArray()).array(); }
@@ -119,6 +120,7 @@ QJsonArray ClassifyPanel::buildOps(const QJsonObject& label, const QJsonObject& 
     if (cbEncrypt->isChecked() && !encPw->text().isEmpty()) { ops.append(QJsonObject{{"op", "encrypt"}, {"user_password", encPw->text()}, {"owner_password", encPw->text()}, {"allow_print", true}, {"allow_copy", false}, {"allow_modify", false}, {"allow_annotate", false}}); if (nextPassword) *nextPassword = encPw->text(); }
     return ops;
 }
+bool ClassifyPanel::autoSave() const { return cbAutoSave->isChecked(); }
 QJsonArray ClassifyPanel::buildRemoveOps(const QJsonObject& previousMeta) const {
     QJsonObject extra; for (const QString& k : previousMeta.keys()) if (k.startsWith("MSIP_Label_") || k == "ClassificationLevel" || k == "ClassifiedAt") extra[k] = "";
     return QJsonArray{QJsonObject{{"op", "remove_marks"}}, QJsonObject{{"op", "metadata"}, {"classification", ""}, {"keywords", ""}, {"extra", extra}}};

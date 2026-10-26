@@ -42,6 +42,8 @@ pub enum Op {
     Crop { pages: Vec<u32>, left: f64, top: f64, right: f64, bottom: f64 },
     /// Remove hidden data: metadata, XMP, annotations/forms, JavaScript, embedded files, open actions.
     Sanitize { #[serde(default)] keep_annotations: bool },
+    /// New AcroForm field. kind "text" | "checkbox". Rect as fractions of the displayed page (x,y top-left, w,h).
+    AddField { page: u32, kind: String, name: String, x: f64, y: f64, w: f64, h: f64, #[serde(default)] value: String, #[serde(default)] font_size: f64 },
 }
 
 pub const MARK_BEGIN: &[u8] = b"\n%PDFDLP-MARK-BEGIN\n";
@@ -421,6 +423,7 @@ pub fn apply(doc: &mut Document, ops: &[Op]) -> R<()> {
             Op::RemoveMarks {} => { remove_marks(doc)?; }
             Op::Crop { pages, left, top, right, bottom } => crop(doc, pages, *left, *top, *right, *bottom)?,
             Op::Sanitize { keep_annotations } => sanitize(doc, *keep_annotations)?,
+            Op::AddField { page, kind, name, x, y, w, h, value, font_size } => add_field(doc, *page, kind, name, *x, *y, *w, *h, value, *font_size)?,
         }
     }
     doc.renumber_objects();
@@ -468,6 +471,64 @@ pub fn sanitize(doc: &mut Document, keep_annotations: bool) -> R<()> {
     let ids: Vec<ObjectId> = doc.objects.iter().filter(|(_, o)| o.as_stream().map(|s| s.dict.has_type(b"Metadata")).unwrap_or(false)).map(|(id, _)| *id).collect();
     for id in ids { doc.objects.remove(&id); }
     doc.prune_objects();
+    Ok(())
+}
+
+/// Viewer-space fractional rect -> page-space [x0 y0 x1 y1].
+fn viewer_rect_to_page(g: &Geo, x: f64, y: f64, w: f64, h: f64) -> [f64; 4] {
+    let (pw, ph) = (g.x1 - g.x0, g.y1 - g.y0);
+    let (vw, vh) = if g.rot == 90 || g.rot == 270 { (ph, pw) } else { (pw, ph) };
+    let t = viewer_to_page(g);
+    let map = |vx: f64, vy: f64| (t[0] * vx + t[2] * vy + t[4], t[1] * vx + t[3] * vy + t[5]);
+    let (ax, ay) = map(x * vw, y * vh); let (bx, by) = map((x + w) * vw, (y + h) * vh);
+    [ax.min(bx), ay.min(by), ax.max(bx), ay.max(by)]
+}
+
+/// Add an interactive form field (text / checkbox) with a Helvetica appearance; creates AcroForm when missing.
+#[allow(clippy::too_many_arguments)]
+pub fn add_field(doc: &mut Document, page: u32, kind: &str, name: &str, x: f64, y: f64, w: f64, h: f64, value: &str, font_size: f64) -> R<()> {
+    let all = ordered_pages(doc);
+    let pid = *all.get(page.checked_sub(1).ok_or("หน้าไม่ถูกต้อง")? as usize).ok_or(format!("ไม่มีหน้า {page}"))?;
+    inherit_attrs(doc, pid);
+    let g = geometry(doc, pid)?;
+    let r = viewer_rect_to_page(&g, x, y, w, h);
+    let cat = catalog_id(doc)?;
+    // AcroForm (+ Helvetica in /DR)
+    let helv = doc.add_object(dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding" });
+    let acro_id = match doc.get_object(cat).and_then(Object::as_dict).map_err(e)?.get(b"AcroForm").and_then(Object::as_reference) {
+        Ok(id) => id,
+        Err(_) => {
+            let id = doc.add_object(dictionary! { "Fields" => Vec::<Object>::new(), "DA" => Object::string_literal("/Helv 0 Tf 0 g"), "DR" => dictionary! { "Font" => dictionary! { "Helv" => Object::Reference(helv) } }, "NeedAppearances" => true });
+            doc.get_object_mut(cat).and_then(Object::as_dict_mut).map_err(e)?.set("AcroForm", Object::Reference(id)); id
+        }
+    };
+    let fs = if font_size > 0.0 { font_size } else { ((r[3] - r[1]) * 0.6).clamp(6.0, 14.0) };
+    let field_id = doc.new_object_id();
+    let mut field = dictionary! {
+        "Type" => "Annot", "Subtype" => "Widget", "FT" => if kind == "checkbox" { "Btn" } else { "Tx" },
+        "T" => text_string(name), "Rect" => vec![Object::Real(r[0] as f32), Object::Real(r[1] as f32), Object::Real(r[2] as f32), Object::Real(r[3] as f32)],
+        "F" => 4, "P" => Object::Reference(pid), "MK" => dictionary! { "BC" => vec![Object::Real(0.55), Object::Real(0.6), Object::Real(0.7)], "BG" => vec![Object::Real(0.97), Object::Real(0.98), Object::Real(1.0)] },
+        "BS" => dictionary! { "W" => 1, "S" => "S" }
+    };
+    if kind == "checkbox" {
+        let on = if value == "true" || value == "Yes" { "Yes" } else { "Off" };
+        field.set("V", on); field.set("AS", on);
+        field.set("MK", dictionary! { "BC" => vec![Object::Real(0.4), Object::Real(0.45), Object::Real(0.55)], "CA" => Object::string_literal("4") });
+        field.set("DA", Object::string_literal("/ZaDb 0 Tf 0 g"));
+    } else {
+        field.set("DA", Object::string_literal(format!("/Helv {} Tf 0 g", f(fs))));
+        if !value.is_empty() { field.set("V", text_string(value)); }
+    }
+    doc.objects.insert(field_id, Object::Dictionary(field));
+    // register in AcroForm.Fields and page Annots
+    if let Ok(a) = doc.get_object_mut(acro_id).and_then(Object::as_dict_mut) {
+        let mut fields = a.get(b"Fields").and_then(Object::as_array).map(|v| v.clone()).unwrap_or_default();
+        fields.push(Object::Reference(field_id)); a.set("Fields", fields); a.set("NeedAppearances", true);
+        if kind == "checkbox" { if let Ok(dr) = a.get_mut(b"DR").and_then(Object::as_dict_mut) { if let Ok(fd) = dr.get_mut(b"Font").and_then(Object::as_dict_mut) { if !fd.has(b"ZaDb") { let z = dictionary! { "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "ZapfDingbats" }; fd.set("ZaDb", Object::Dictionary(z)); } } } }
+    }
+    let pd = doc.get_object_mut(pid).and_then(Object::as_dict_mut).map_err(e)?;
+    let mut annots = match pd.get(b"Annots") { Ok(Object::Array(a)) => a.clone(), _ => vec![] };
+    annots.push(Object::Reference(field_id)); pd.set("Annots", annots);
     Ok(())
 }
 

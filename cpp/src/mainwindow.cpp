@@ -6,12 +6,15 @@
 #include "icons.h"
 #include "i18n.h"
 #include "stamps.h"
+#include "present.h"
+#include "dialogs.h"
 
 static const QColor kBlue("#4f8cff");
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle("PDF DLP"); resize(1380, 880); setAcceptDrops(true); setDockOptions(QMainWindow::AnimatedDocks);
     // --- toolbar ---
+    { auto* top = addToolBar("rgbtop"); top->setObjectName("rgbtop"); top->setMovable(false); top->setFixedHeight(3); auto* f = new QFrame; f->setObjectName("rgbbar"); f->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed); top->addWidget(f); addToolBarBreak(); }
     tb = addToolBar("main"); tb->setMovable(false); tb->setIconSize(QSize(18, 18)); tb->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     auto* brand = new QWidget; auto* bl = new QHBoxLayout(brand); bl->setContentsMargins(4, 0, 10, 0); auto* logo = FA::label(FA::ShieldHalved, QColor("#7b5cff"), 18); auto* bt = new QLabel("<b>PDF DLP</b>"); bl->addWidget(logo); bl->addWidget(bt); tb->addWidget(brand);
     homeAct = tb->addAction(FA::icon(FA::House, QColor("#7b5cff")), ""); openAct = tb->addAction(FA::icon(FA::FolderOpen, kBlue), ""); saveAct = tb->addAction(FA::icon(FA::Save, Qt::white), ""); undoAct = tb->addAction(FA::icon(FA::Undo, QColor("#6f7a89")), "");
@@ -24,25 +27,27 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // --- center ---
     center = new QStackedWidget; auto* wrap = new QWidget; auto* wv = new QVBoxLayout(wrap); wv->setContentsMargins(0, 0, 0, 0); wv->setSpacing(0);
     auto* vbar = new QToolBar; vbar->setObjectName("viewbar"); vbar->setMovable(false); vbar->setIconSize(QSize(16, 16)); vbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    auto* leftTog = vbar->addAction(FA::icon(FA::AnglesLeft, QColor("#6f7a89"), 15), ""); leftTog->setCheckable(true); leftTog->setChecked(true); leftTog->setToolTip(TXT("sidebarLeft") + " (⌘1)");
-    connect(leftTog, &QAction::toggled, this, [this, leftTog](bool on) { if (leftDock) leftDock->setVisible(on); leftTog->setIcon(FA::icon(on ? FA::AnglesLeft : FA::AnglesRight, QColor("#6f7a89"), 15)); });
+    auto* leftTog = vbar->addAction(FA::icon(FA::AnglesLeft, QColor("#a3adbb"), 13), ""); leftTog->setCheckable(true); leftTog->setChecked(true); leftTog->setToolTip(TXT("sidebarLeft") + " (⌘1)");
+    connect(leftTog, &QAction::toggled, this, [this, leftTog](bool on) { if (leftDock) leftDock->setVisible(on); leftTog->setIcon(FA::icon(on ? FA::AnglesLeft : FA::AnglesRight, QColor("#a3adbb"), 13)); });
     auto* vsp = new QWidget; vsp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); vbar->addWidget(vsp);
     prevAct = vbar->addAction(FA::icon(FA::ChevronUp, QColor("#6f7a89"), 16), ""); pageEdit = new QLineEdit; pageEdit->setFixedWidth(46); pageEdit->setAlignment(Qt::AlignCenter); vbar->addWidget(pageEdit); pageTotal = new QLabel(" / 0 "); vbar->addWidget(pageTotal); nextAct = vbar->addAction(FA::icon(FA::ChevronDown, QColor("#6f7a89"), 16), "");
     vbar->addSeparator();
     zoomOutAct = vbar->addAction(FA::icon(FA::Minus, QColor("#6f7a89"), 16), ""); zoomLbl = new QLabel(" 100% "); zoomLbl->setFixedWidth(52); zoomLbl->setAlignment(Qt::AlignCenter); vbar->addWidget(zoomLbl); zoomInAct = vbar->addAction(FA::icon(FA::Plus, QColor("#6f7a89"), 16), "");
     fitWAct = vbar->addAction(FA::icon(FA::ArrowsLR, QColor("#6f7a89"), 16), ""); fitPAct = vbar->addAction(FA::icon(FA::Expand, QColor("#6f7a89"), 16), "");
     auto* vsp2 = new QWidget; vsp2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); vbar->addWidget(vsp2);
-    auto* rightTog = vbar->addAction(FA::icon(FA::AnglesRight, QColor("#6f7a89"), 15), ""); rightTog->setCheckable(true); rightTog->setChecked(true); rightTog->setToolTip(TXT("sidebarRight") + " (⌘2)");
-    connect(rightTog, &QAction::toggled, this, [this, rightTog](bool on) { if (rightDock) rightDock->setVisible(on); rightTog->setIcon(FA::icon(on ? FA::AnglesRight : FA::AnglesLeft, QColor("#6f7a89"), 15)); });
+    auto* rightTog = vbar->addAction(FA::icon(FA::AnglesRight, QColor("#a3adbb"), 13), ""); rightTog->setCheckable(true); rightTog->setChecked(true); rightTog->setToolTip(TXT("sidebarRight") + " (⌘2)");
+    connect(rightTog, &QAction::toggled, this, [this, rightTog](bool on) { if (rightDock) rightDock->setVisible(on); rightTog->setIcon(FA::icon(on ? FA::AnglesRight : FA::AnglesLeft, QColor("#a3adbb"), 13)); });
     auto* l1 = new QShortcut(QKeySequence("Ctrl+1"), this); connect(l1, &QShortcut::activated, leftTog, &QAction::toggle);
     auto* r2 = new QShortcut(QKeySequence("Ctrl+2"), this); connect(r2, &QShortcut::activated, rightTog, &QAction::toggle);
+    auto* f5 = new QShortcut(QKeySequence(Qt::Key_F5), this); connect(f5, &QShortcut::activated, this, &MainWindow::present);
     wv->addWidget(vbar);
+    buildEditBar(); wv->addWidget(editbar); editbar->hide();
     home = new HomeView;
     viewer = new Viewer; center->addWidget(home); center->addWidget(viewer); wv->addWidget(center, 1); setCentralWidget(wrap);
     // --- docks ---
     sidebar = new Sidebar; leftDock = new QDockWidget; leftDock->setWidget(sidebar); leftDock->setFeatures(QDockWidget::NoDockWidgetFeatures); leftDock->setFixedWidth(230); leftDock->setTitleBarWidget(new QWidget); addDockWidget(Qt::LeftDockWidgetArea, leftDock);
     buildToolbox();
-    rightTabs = new QTabWidget; classify = new ClassifyPanel; infoPanel = new InfoPanel; rightTabs->addTab(classify, ""); rightTabs->addTab(infoPanel, "");
+    rightTabs = new QTabWidget; classify = new ClassifyPanel; infoPanel = new InfoPanel; rightTabs->addTab(classify, ""); rightTabs->addTab(infoPanel, ""); rightTabs->setDocumentMode(true); rightTabs->tabBar()->setExpanding(true); rightTabs->tabBar()->setDrawBase(false);
     rightDock = new QDockWidget; rightDock->setWidget(rightTabs); rightDock->setFeatures(QDockWidget::NoDockWidgetFeatures); rightDock->setFixedWidth(330); rightDock->setTitleBarWidget(new QWidget); addDockWidget(Qt::RightDockWidgetArea, rightDock);
     setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea); setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
     statusBar()->showMessage("");
@@ -102,6 +107,7 @@ void MainWindow::retranslate() {
     modifiedBadge->setText(TXT("modified")); rightTabs->setTabText(0, TXT("classify")); rightTabs->setTabText(1, TXT("info"));
     rightTabs->setTabIcon(0, FA::icon(FA::Tag, QColor("#f4a33f"), 14)); rightTabs->setTabIcon(1, FA::icon(FA::Info, QColor("#34c77b"), 14));
     for (int i = 0; i < toolActs.size(); i++) toolActs[i]->setText(TXT(toolDefs()[i].label));
+    { const char* keys[] = {"etSelect", "etText", "etImage", "etLine", "etRect", "etField", "etCheckbox"}; for (int i = 0; i < editToolActs.size() && i < 7; i++) editToolActs[i]->setText(TXT(keys[i])); if (delAct) delAct->setText(TXT("deleteObject")); if (fillChk) fillChk->setText(TXT("fill")); if (auto* b = editbar ? editbar->findChild<QPushButton*>("editCancel") : nullptr) b->setText(TXT("cancelEdit")); if (auto* b = editbar ? editbar->findChild<QPushButton*>("primary") : nullptr) b->setText(TXT("finishEdit")); }
     home->retranslate();
     sidebar->retranslate(); classify->retranslate(); refreshAll();
 }
@@ -152,16 +158,27 @@ void MainWindow::reloadActive(const QString& newWorkPath, const QString& passwor
     d->workPath = newWorkPath; d->password = password; d->pdf = pdf; d->modified = modified; d->info = Core::info(newWorkPath, password);
     refreshAll();
 }
-void MainWindow::runOps(const QJsonArray& ops, const QString& nextPassword, bool keepPassword) {
+void MainWindow::runOps(const QJsonArray& ops, const QString& nextPassword, bool keepPassword, std::function<void()> after) {
     Document* d = active(); if (!d) return;
     const int idx = activeIdx; const QString path = d->workPath, pw = d->password; const QString newPw = nextPassword.isNull() ? (keepPassword ? pw : QString()) : nextPassword;
     setBusy(TXT("loading"));
-    Core::async([=]() { return Core::apply(path, pw, ops); }, [this, idx, newPw](QJsonObject r) {
+    Core::async([=]() { return Core::apply(path, pw, ops); }, [this, idx, newPw, after](QJsonObject r) {
         setBusy("");
         if (idx != activeIdx) return;
         if (!r.value("ok").toBool()) { toast(QString("%1: %2").arg(TXT("error"), r.value("error").toString()), "err"); return; }
         reloadActive(r.value("path").toString(), newPw, true);
+        if (after) after();
     });
+}
+/// Write the current work copy back over the original file (keeps a backup in the app data folder).
+bool MainWindow::writeBack(Document& d) {
+    if (d.path.isEmpty() || !QFileInfo::exists(d.path) || d.path == d.workPath) return false;
+    const QString bdir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/backup"; QDir().mkpath(bdir);
+    const QString backup = bdir + "/" + QFileInfo(d.path).completeBaseName() + "-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + ".pdf";
+    QFile::copy(d.path, backup);
+    QFile::remove(d.path);
+    if (!QFile::copy(d.workPath, d.path)) { toast(TXT("error") + ": write back", "err"); return false; }
+    d.modified = false; HomeView::remember(d.path, d.pages(), d.pdf->render(0, 186, 2.0)); return true;
 }
 void MainWindow::openProduced(const QString& path, const QString& name, const QString& password) {
     bool needs = false; auto pdf = PdfDoc::open(path, password, &needs); if (!pdf) { toast(TXT("error"), "err"); return; }
@@ -209,15 +226,17 @@ void MainWindow::tool(const QString& key) {
     else if (key == "redact") { if (Dialogs::redact(this, *d, viewer->currentPage() + 1, ops)) runOps(ops); }
     else if (key == "print") printDoc();
     else if (key == "email") emailDoc();
+    else if (key == "edit") enterEdit();
+    else if (key == "present") present();
 }
 
 void MainWindow::applyLabel() {
     Document* d = active(); const QJsonObject label = classify->selectedLabel(); if (!d || label.isEmpty()) return;
     QString next; const QJsonArray ops = classify->buildOps(label, d->info.value("metadata").toObject(), &next);
-    runOps(ops, next.isEmpty() ? QString() : next);
-    toast(QString("%1: %2").arg(TXT("labelApplied"), label.value("name").toString()));
+    const QString lname = label.value("name").toString(); const bool autosave = classify->autoSave();
+    runOps(ops, next.isEmpty() ? QString() : next, true, [this, lname, autosave]() { Document* x = active(); if (x && autosave && writeBack(*x)) { refreshAll(); toast(QString("%1: %2 · %3").arg(TXT("labelApplied"), lname, TXT("savedToFile"))); } else toast(QString("%1: %2").arg(TXT("labelApplied"), lname)); });
 }
-void MainWindow::removeLabel() { Document* d = active(); if (!d) return; runOps(classify->buildRemoveOps(d->info.value("metadata").toObject())); toast(TXT("labelRemoved")); }
+void MainWindow::removeLabel() { Document* d = active(); if (!d) return; const bool autosave = classify->autoSave(); runOps(classify->buildRemoveOps(d->info.value("metadata").toObject()), QString(), true, [this, autosave]() { Document* x = active(); if (x && autosave && writeBack(*x)) { refreshAll(); toast(TXT("labelRemoved") + " · " + TXT("savedToFile")); } else toast(TXT("labelRemoved")); }); }
 void MainWindow::batchLabel() {
     const QJsonObject label = classify->selectedLabel(); if (label.isEmpty()) return;
     // checked open files → apply in place (undoable, saved later); none checked → pick files + output folder
@@ -231,8 +250,9 @@ void MainWindow::batchLabel() {
             if (!r.value("ok").toBool()) { toast(QString("%1: %2").arg(d.name, r.value("error").toString()), "err"); continue; }
             const QString newPw = next.isEmpty() ? d.password : next; bool needs = false; auto pdf = PdfDoc::open(r.value("path").toString(), newPw, &needs); if (!pdf) continue;
             d.history << d.workPath; d.workPath = r.value("path").toString(); d.password = newPw; d.pdf = pdf; d.modified = true; d.info = Core::info(d.workPath, newPw); ok++;
+            if (classify->autoSave()) writeBack(d);
         }
-        setBusy(""); refreshAll(); toast(QString("%1 %2: %3/%4").arg(TXT("batch"), TXT("done")).arg(ok).arg(checkedIdx.size())); return;
+        setBusy(""); refreshAll(); toast(QString("%1 %2: %3/%4%5").arg(TXT("batch"), TXT("done")).arg(ok).arg(checkedIdx.size()).arg(classify->autoSave() ? " · " + TXT("savedToFile") : "")); return;
     }
     const QStringList files = QFileDialog::getOpenFileNames(this, TXT("batch"), QString(), "PDF (*.pdf)"); if (files.isEmpty()) return;
     const QString dir = QFileDialog::getExistingDirectory(this, TXT("chooseFolder")); if (dir.isEmpty()) return;
@@ -253,6 +273,99 @@ void MainWindow::printDoc() {
         const QRect page = printer.pageRect(QPrinter::DevicePixel).toRect(); QImage img = d->pdf->render(i, page.width());
         const QSize sz = img.size().scaled(page.size(), Qt::KeepAspectRatio); p.drawImage(QRect(page.topLeft(), sz), img);
     }
+}
+QList<QPair<QString, QByteArray>> MainWindow::editFonts() {
+    QList<QPair<QString, QByteArray>> out;
+    QStringList dirs = {QCoreApplication::applicationDirPath() + "/../Resources/fonts/edit", QCoreApplication::applicationDirPath() + "/fonts/edit"};
+    QStringList order = {"NotoSansThai-Regular", "NotoSansThai-Bold", "Sarabun-Regular", "Sarabun-Bold", "Kanit-Regular", "Kanit-Bold", "Prompt-Regular", "Prompt-Bold", "Mitr-Regular", "BaiJamjuree-Regular", "BaiJamjuree-Bold", "IBMPlexSansThai-Regular", "IBMPlexSansThai-Bold", "ChakraPetch-Regular", "Pridi-Regular", "Taviraj-Regular", "Athiti-Regular", "Lato-Regular", "Lato-Bold", "Poppins-Regular", "Poppins-Bold", "PT_Sans-Web-Regular", "Outfit-Regular", "Outfit-Bold", "CourierPrime-Regular"};
+    for (const QString& d : dirs) {
+        if (!QDir(d).exists()) continue;
+        QStringList files = QDir(d).entryList({"*.ttf"}, QDir::Files);
+        std::sort(files.begin(), files.end(), [&](const QString& a, const QString& b) { int ia = order.indexOf(QFileInfo(a).completeBaseName()), ib = order.indexOf(QFileInfo(b).completeBaseName()); if (ia < 0) ia = 999; if (ib < 0) ib = 999; return ia != ib ? ia < ib : a < b; });
+        for (const QString& f : files) { QFile file(d + "/" + f); if (file.open(QIODevice::ReadOnly)) { QString name = QFileInfo(f).completeBaseName().replace("PT_Sans-Web", "PT Sans").replace("NotoSansThai", "Noto Sans Thai").replace("IBMPlexSansThai", "IBM Plex Sans Thai").replace("BaiJamjuree", "Bai Jamjuree").replace("ChakraPetch", "Chakra Petch").replace("CourierPrime", "Courier Prime").replace("-Regular", "").replace("-", " "); out << qMakePair(name, file.readAll()); } }
+        break;
+    }
+    return out;
+}
+void MainWindow::buildEditBar() {
+    editbar = new QToolBar; editbar->setObjectName("editbar"); editbar->setMovable(false); editbar->setIconSize(QSize(15, 15)); editbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    editTools = new QActionGroup(this); editTools->setExclusive(true);
+    struct T { EditTool t; ushort icon; const char* key; };
+    const T defs[] = {{EditTool::Select, FA::ArrowPointer, "etSelect"}, {EditTool::Text, FA::Font, "etText"}, {EditTool::Image, FA::Image, "etImage"}, {EditTool::Line, FA::Slash, "etLine"}, {EditTool::Rect, FA::Square, "etRect"}, {EditTool::TextField, FA::ICursor, "etField"}, {EditTool::Checkbox, FA::SquareCheck, "etCheckbox"}};
+    for (const T& d : defs) { QAction* a = editbar->addAction(FA::icon(d.icon, QColor("#c62828"), 15), TXT(d.key)); a->setCheckable(true); a->setData(int(d.t)); editTools->addAction(a); editToolActs << a; const EditTool t = d.t; connect(a, &QAction::triggered, this, [this, t]() { viewer->edit.tool = t; }); }
+    editToolActs.first()->setChecked(true);
+    editbar->addSeparator();
+    fontBox = new QComboBox; fontBox->setMinimumWidth(150); editbar->addWidget(fontBox); connect(fontBox, &QComboBox::currentTextChanged, this, [this](const QString& f) { viewer->edit.font = f; });
+    sizeBox = new QDoubleSpinBox; sizeBox->setRange(4, 200); sizeBox->setValue(14); sizeBox->setDecimals(0); sizeBox->setSuffix(" pt"); sizeBox->setFixedWidth(70); editbar->addWidget(sizeBox); connect(sizeBox, &QDoubleSpinBox::valueChanged, this, [this](double v) { viewer->edit.fontSize = v; });
+    colorBtn = new QPushButton; colorBtn->setFixedSize(26, 26); colorBtn->setToolTip(TXT("color")); editbar->addWidget(colorBtn);
+    auto paintBtn = [](QPushButton* b, const QColor& c) { b->setStyleSheet(QString("background:%1;border:1px solid #c5cfdc;border-radius:6px;").arg(c.name())); };
+    paintBtn(colorBtn, viewer->edit.color);
+    connect(colorBtn, &QPushButton::clicked, this, [this, paintBtn]() { const QColor c = QColorDialog::getColor(viewer->edit.color, this); if (c.isValid()) { viewer->edit.color = c; viewer->edit.strokeColor = c; paintBtn(colorBtn, c); } });
+    strokeBox = new QDoubleSpinBox; strokeBox->setRange(0.2, 30); strokeBox->setValue(1.5); strokeBox->setDecimals(1); strokeBox->setSuffix(" px"); strokeBox->setFixedWidth(70); strokeBox->setToolTip(TXT("strokeWidth")); editbar->addWidget(strokeBox); connect(strokeBox, &QDoubleSpinBox::valueChanged, this, [this](double v) { viewer->edit.stroke = v; });
+    fillChk = new QCheckBox(TXT("fill")); editbar->addWidget(fillChk); connect(fillChk, &QCheckBox::toggled, this, [this](bool on) { viewer->edit.filled = on; });
+    fillBtn = new QPushButton; fillBtn->setFixedSize(26, 26); fillBtn->setToolTip(TXT("fillColor")); editbar->addWidget(fillBtn); paintBtn(fillBtn, viewer->edit.fill);
+    connect(fillBtn, &QPushButton::clicked, this, [this, paintBtn]() { const QColor c = QColorDialog::getColor(viewer->edit.fill, this, QString(), QColorDialog::ShowAlphaChannel); if (c.isValid()) { viewer->edit.fill = c; paintBtn(fillBtn, c); } });
+    editbar->addSeparator();
+    delAct = editbar->addAction(FA::icon(FA::TrashCan, QColor("#e5484d"), 15), TXT("deleteObject")); delAct->setEnabled(false); connect(delAct, &QAction::triggered, this, [this]() { viewer->deleteSelected(); });
+    auto* sp = new QWidget; sp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); editbar->addWidget(sp);
+    auto* cancel = new QPushButton(TXT("cancelEdit")); cancel->setObjectName("editCancel"); editbar->addWidget(cancel); connect(cancel, &QPushButton::clicked, this, [this]() { finishEdit(false); });
+    auto* done = new QPushButton(TXT("finishEdit")); done->setObjectName("primary"); done->setIcon(FA::icon(FA::CheckCircle, Qt::white, 14)); editbar->addWidget(done); connect(done, &QPushButton::clicked, this, [this]() { finishEdit(true); });
+    connect(viewer, &Viewer::selectionChanged, this, [this]() { delAct->setEnabled(viewer->hasSelection()); });
+    connect(viewer, &Viewer::textRequested, this, [this](int page, QPointF pt) {
+        if (!session) return;
+        auto* d = Dialogs::make(this, TXT("etText"), 460); auto* te = new QTextEdit; te->setMinimumHeight(90); static_cast<QVBoxLayout*>(d->layout())->addWidget(te); auto* ok = Dialogs::primary(TXT("ok")); auto* row = new QHBoxLayout; row->addStretch(); row->addWidget(ok); static_cast<QVBoxLayout*>(d->layout())->addLayout(row); connect(ok, &QPushButton::clicked, d, &QDialog::accept); te->setFocus();
+        if (d->exec() == QDialog::Accepted && !te->toPlainText().trimmed().isEmpty()) { session->addText(page, pt, te->toPlainText(), viewer->edit.fontSize, viewer->edit.color, viewer->edit.font); viewer->refreshPage(page); }
+        d->deleteLater();
+    });
+    connect(viewer, &Viewer::editTextRequested, this, [this](int page, int obj, QString cur) {
+        if (!session) return;
+        auto* d = Dialogs::make(this, TXT("editText"), 460); auto* te = new QTextEdit(cur); te->setMinimumHeight(90); static_cast<QVBoxLayout*>(d->layout())->addWidget(te); auto* hint = new QLabel(TXT("editTextHint")); hint->setObjectName("hint"); hint->setWordWrap(true); static_cast<QVBoxLayout*>(d->layout())->addWidget(hint); auto* ok = Dialogs::primary(TXT("ok")); auto* row = new QHBoxLayout; row->addStretch(); row->addWidget(ok); static_cast<QVBoxLayout*>(d->layout())->addLayout(row); connect(ok, &QPushButton::clicked, d, &QDialog::accept); te->setFocus(); te->selectAll();
+        if (d->exec() == QDialog::Accepted && te->toPlainText() != cur) { session->setText(page, obj, te->toPlainText(), viewer->edit.font); viewer->refreshPage(page); }
+        d->deleteLater();
+    });
+    connect(viewer, &Viewer::imageRectDrawn, this, [this](int page, QRectF r) {
+        if (!session) return; const QString f = QFileDialog::getOpenFileName(this, TXT("image"), QString(), "Images (*.png *.jpg *.jpeg *.webp)"); if (f.isEmpty()) return;
+        QImage img(f); if (img.isNull()) return; const double ar = double(img.height()) / img.width(); QRectF rr(r.topLeft(), QSizeF(r.width(), r.width() * ar)); session->addImage(page, rr, img); viewer->refreshPage(page);
+    });
+    connect(viewer, &Viewer::fieldRectDrawn, this, [this](int page, QRectF r, bool checkbox) {
+        if (!session) return;
+        const QSizeF s = session->size(page); const QString name = QInputDialog::getText(this, checkbox ? TXT("etCheckbox") : TXT("etField"), TXT("fieldName"), QLineEdit::Normal, QString("%1%2").arg(checkbox ? "check" : "field").arg(pendingFieldOps.size() + 1)); if (name.isEmpty()) return;
+        pendingFieldOps.append(QJsonObject{{"op", "add_field"}, {"page", page + 1}, {"kind", checkbox ? "checkbox" : "text"}, {"name", name}, {"x", r.x() / s.width()}, {"y", r.y() / s.height()}, {"w", r.width() / s.width()}, {"h", r.height() / s.height()}, {"value", ""}, {"font_size", 0}});
+        // preview: draw the field frame into the session so the user sees it now
+        session->addRect(page, r, QColor("#8c99ad"), 0.8, QColor("#f7f9ff"), true); viewer->refreshPage(page);
+        toast(QString("%1: %2").arg(checkbox ? TXT("etCheckbox") : TXT("etField"), name));
+    });
+}
+void MainWindow::enterEdit() {
+    Document* d = active(); if (!d || session) return;
+    session = std::make_unique<EditSession>(d->workPath, d->password, editFonts());
+    if (!session->ok()) { toast(TXT("error") + ": " + session->error, "err"); session.reset(); return; }
+    pendingFieldOps = QJsonArray();
+    fontBox->blockSignals(true); fontBox->clear(); fontBox->addItems(session->fontNames()); fontBox->blockSignals(false); viewer->edit.font = fontBox->currentText();
+    viewer->edit.tool = EditTool::Select; editToolActs.first()->setChecked(true);
+    viewer->setEditSession(session.get()); editbar->show(); toolbox->setEnabled(false); sidebar->setEnabled(false);
+    viewer->setFocus();
+}
+void MainWindow::finishEdit(bool save) {
+    if (!session) return;
+    Document* d = active();
+    if (save && d && (session->dirty || !pendingFieldOps.isEmpty())) {
+        const QString tmp = QDir::tempPath() + "/pdfdlp/edit-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmsszzz") + ".pdf"; QDir().mkpath(QFileInfo(tmp).absolutePath());
+        if (!session->save(tmp)) { toast(TXT("error") + ": " + session->error, "err"); }
+        else {
+            QString out = tmp; QString pw = d->password;
+            if (!pendingFieldOps.isEmpty()) { const QJsonObject r = Core::apply(tmp, pw, pendingFieldOps); if (r.value("ok").toBool()) out = r.value("path").toString(); else { const QJsonObject r2 = Core::apply(tmp, "", pendingFieldOps); if (r2.value("ok").toBool()) { out = r2.value("path").toString(); pw = ""; } else toast(r.value("error").toString(), "err"); } }
+            viewer->setEditSession(nullptr); session.reset();
+            bool needs = false; auto test = PdfDoc::open(out, pw, &needs); if (!test && needs) pw = "";
+            reloadActive(out, pw, true); toast(TXT("editSaved"));
+        }
+    }
+    viewer->setEditSession(nullptr); session.reset(); pendingFieldOps = QJsonArray();
+    editbar->hide(); toolbox->setEnabled(true); sidebar->setEnabled(true); viewer->refreshAllPages();
+}
+void MainWindow::present() {
+    Document* d = active(); if (!d) return;
+    auto* w = new PresentWidget(d->pdf, viewer->currentPage()); w->showFullScreen(); w->setFocus();
 }
 /// Open the default mail client (Outlook preferred) with the current version of the document attached.
 void MainWindow::emailDoc() {

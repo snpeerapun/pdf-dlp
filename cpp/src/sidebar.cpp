@@ -3,10 +3,28 @@
 #include "i18n.h"
 #include <QtConcurrent>
 
+class FileDelegate : public QStyledItemDelegate {
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+    void paint(QPainter* p, const QStyleOptionViewItem& opt, const QModelIndex& idx) const override {
+        QStyleOptionViewItem o(opt); o.state &= ~QStyle::State_Selected; o.state &= ~QStyle::State_HasFocus;
+        const QRectF r = QRectF(opt.rect).adjusted(5, 2, -5, -2);
+        p->save(); p->setRenderHint(QPainter::Antialiasing);
+        if (opt.state & QStyle::State_Selected) {
+            QLinearGradient g(r.topLeft(), r.topRight()); g.setColorAt(0, QColor("#ff5f6d")); g.setColorAt(0.25, QColor("#ffc371")); g.setColorAt(0.5, QColor("#34c77b")); g.setColorAt(0.75, QColor("#4f8cff")); g.setColorAt(1, QColor("#7b5cff"));
+            p->setPen(QPen(QBrush(g), 2)); p->setBrush(QColor("#f3f7ff")); p->drawRoundedRect(r, 8, 8);
+        } else if (opt.state & QStyle::State_MouseOver) { p->setPen(Qt::NoPen); p->setBrush(QColor("#f1f4f9")); p->drawRoundedRect(r, 8, 8); }
+        p->restore();
+        o.rect = opt.rect.adjusted(8, 0, -8, 0);
+        QStyledItemDelegate::paint(p, o, idx);
+    }
+    QSize sizeHint(const QStyleOptionViewItem& opt, const QModelIndex& idx) const override { QSize s = QStyledItemDelegate::sizeHint(opt, idx); s.setHeight(38); return s; }
+};
+
 static QThreadPool& thumbPool() { static QThreadPool p; p.setMaxThreadCount(1); return p; }
 
 Sidebar::Sidebar(QWidget* parent) : QTabWidget(parent) {
-    files = new QListWidget; files->setObjectName("files"); files->setContextMenuPolicy(Qt::CustomContextMenu); files->setIconSize(QSize(18, 18)); files->setTextElideMode(Qt::ElideMiddle); files->setWordWrap(false); files->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff); files->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
+    files = new QListWidget; files->setObjectName("files"); files->setContextMenuPolicy(Qt::CustomContextMenu); files->setIconSize(QSize(18, 18)); files->setTextElideMode(Qt::ElideMiddle); files->setItemDelegate(new FileDelegate(files)); files->setMouseTracking(true); files->setWordWrap(false); files->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff); files->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
     auto* filesTab = new QWidget; auto* fv = new QVBoxLayout(filesTab); fv->setContentsMargins(0, 0, 0, 0); fv->setSpacing(0);
     auto* fbar = new QWidget; auto* fh = new QVBoxLayout(fbar); fh->setContentsMargins(12, 6, 8, 4); fh->setSpacing(2); allFiles = new QCheckBox; allFiles->setTristate(false); filesLabel = new QLabel; filesLabel->setObjectName("hint"); filesLabel->setWordWrap(true); fh->addWidget(allFiles); fh->addWidget(filesLabel);
     fv->addWidget(fbar); fv->addWidget(files, 1);
@@ -17,7 +35,7 @@ Sidebar::Sidebar(QWidget* parent) : QTabWidget(parent) {
     thumbs = new QListWidget; thumbs->setObjectName("thumbs"); thumbs->setViewMode(QListView::IconMode); thumbs->setIconSize(QSize(140, 198)); thumbs->setResizeMode(QListView::Adjust); thumbs->setMovement(QListView::Static);
     thumbs->setSelectionMode(QAbstractItemView::ExtendedSelection); thumbs->setContextMenuPolicy(Qt::CustomContextMenu); thumbs->setSpacing(4); thumbs->setUniformItemSizes(true); thumbs->setWordWrap(false);
     v->addWidget(bar); v->addWidget(thumbs, 1);
-    addTab(filesTab, ""); addTab(pagesTab, "");
+    addTab(filesTab, ""); addTab(pagesTab, ""); setDocumentMode(true); tabBar()->setExpanding(true); tabBar()->setDrawBase(false);
     retranslate();
     connect(files, &QListWidget::currentRowChanged, this, [this](int r) { if (r >= 0) emit fileActivated(r); });
     connect(files, &QListWidget::itemChanged, this, [this](QListWidgetItem* it) { const int n = checkedFiles().size(); filesLabel->setText(n ? QString("%1 %2").arg(n).arg(TXT("filesChecked")) : TXT("checkHint")); allFiles->blockSignals(true); allFiles->setChecked(n > 0 && n == files->count()); allFiles->blockSignals(false); emit fileChecked(files->row(it), it->checkState() == Qt::Checked); });

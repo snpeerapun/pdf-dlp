@@ -22,6 +22,7 @@ static void parseArgs(const QStringList& args, QString& action, QStringList& pat
 
 #include "core.h"
 #include "stamps.h"
+#include "edit.h"
 // Headless end-to-end check of the C++ ↔ Rust core ↔ PDFium chain: --selftest <fixture.pdf> <outdir>
 static int selfTest(const QString& fixture, const QString& outDir) {
     int fails = 0; auto step = [&](const QString& name, std::function<QString()> fn) { QElapsedTimer t; t.start(); QString d; bool ok = true; try { d = fn(); } catch (const std::exception& e) { ok = false; d = e.what(); } if (d.startsWith("FAIL")) ok = false; if (!ok) fails++; fprintf(stdout, "%s %s (%lld ms) %s\n", ok ? "OK  " : "FAIL", qPrintable(name), (long long)t.elapsed(), qPrintable(d)); };
@@ -38,6 +39,21 @@ static int selfTest(const QString& fixture, const QString& outDir) {
         bool n; auto d = PdfDoc::open(work, "", &n); d->render(0, 900).save(outDir + "/selftest-classified-p1.png"); return QString("msip=%1").arg(i.value("msip").toObject().value("id").toString()); });
     step("encrypt AES-256 + wrong password rejected", [&]() { auto r = req(Core::apply(work, pw, {QJsonObject{{"op", "encrypt"}, {"user_password", "secret"}, {"owner_password", "owner"}, {"allow_print", true}, {"allow_copy", false}, {"allow_modify", false}, {"allow_annotate", false}}})); work = r.value("path").toString(); pw = "secret"; auto i = req(Core::info(work, "secret")); if (!i.value("encrypted").toBool()) return QString("FAIL not encrypted"); auto bad = Core::info(work, "nope"); if (!bad.value("needs_password").toBool()) return QString("FAIL wrong pw accepted"); bool n = false; auto d = PdfDoc::open(work, "nope", &n); if (d || !n) return QString("FAIL pdfium accepted wrong pw"); d = PdfDoc::open(work, "secret", &n); return d ? QString("pdfium opened pages=%1").arg(d->pages()) : QString("FAIL pdfium open"); });
     step("remove label + decrypt", [&]() { QJsonObject extra; for (const QString& k : req(Core::info(work, pw)).value("metadata").toObject().keys()) if (k.startsWith("MSIP_")) extra[k] = ""; auto r = req(Core::apply(work, pw, {QJsonObject{{"op", "remove_marks"}}, QJsonObject{{"op", "metadata"}, {"classification", ""}, {"keywords", ""}, {"extra", extra}}, QJsonObject{{"op", "decrypt"}}})); work = r.value("path").toString(); pw = ""; auto i = req(Core::info(work)); return (!i.value("encrypted").toBool() && !i.value("has_marks").toBool() && i.value("classification").toString().isEmpty() && i.value("msip").isNull()) ? QString("clean") : QString("FAIL ") + QJsonDocument(i).toJson(QJsonDocument::Compact); });
+    step("edit: add Thai text + box + line, move, save", [&]() {
+        QList<QPair<QString, QByteArray>> fonts; QFile f(QCoreApplication::applicationDirPath() + "/../Resources/fonts/edit/Sarabun-Regular.ttf"); if (!f.open(QIODevice::ReadOnly)) return QString("FAIL font"); fonts << qMakePair(QString("Sarabun"), f.readAll());
+        EditSession es(work, pw, fonts); if (!es.ok()) return QString("FAIL open");
+        const int before = es.objects(0).size();
+        es.addText(0, QPointF(60, 700), QString::fromUtf8("ทดสอบแก้ไข PDF ภาษาไทย"), 16, QColor("#1f2733"), "Sarabun");
+        es.addRect(0, QRectF(50, 680, 300, 40), QColor("#e5484d"), 1.5, QColor("#fff3d6"), true); es.addLine(0, QPointF(50, 740), QPointF(350, 740), QColor("#4f8cff"), 2);
+        const int after = es.objects(0).size(); if (after < before + 3) return QString("FAIL objects %1->%2").arg(before).arg(after);
+        es.move(0, after - 3, QPointF(10, 0));
+        const QString o = outDir + "/selftest-edited.pdf"; if (!es.save(o)) return QString("FAIL save ") + es.error;
+        bool n; auto d = PdfDoc::open(o, pw, &n); if (!d) return QString("FAIL reopen");
+        const QString txt = d->pageText(0); if (!txt.contains(QString::fromUtf8("ภาษาไทย"))) return QString("FAIL text not found: ") + txt.left(80);
+        d->render(0, 900).save(outDir + "/selftest-edited-p1.png");
+        const QJsonObject r = req(Core::apply(o, pw, {QJsonObject{{"op", "add_field"}, {"page", 1}, {"kind", "text"}, {"name", "fullname"}, {"x", 0.1}, {"y", 0.5}, {"w", 0.4}, {"h", 0.04}, {"value", "Somchai"}, {"font_size", 0}}}));
+        return QString("objects %1->%2, field ok pages=%3").arg(before).arg(after).arg(r.value("pages").toInt());
+    });
     step("merge", [&]() { auto r = req(Core::merge(QJsonArray{QJsonObject{{"path", work}}, QJsonObject{{"path", fixture}, {"pages", QJsonArray{1}}}})); return r.value("pages").toInt() == 3 ? QString("pages=3") : QString("FAIL pages=%1").arg(r.value("pages").toInt()); });
     step("split each", [&]() { auto r = req(Core::split(fixture, "", "each", "", 1, outDir)); return QString("files=%1").arg(r.value("files").toArray().size()); });
     step("images->pdf", [&]() { QImage img(300, 200, QImage::Format_RGB32); img.fill(QColor("#4f8cff")); img.save(outDir + "/st.png"); auto r = req(Core::imagesToPdf({outDir + "/st.png"}, true)); return QString("pages=%1").arg(r.value("pages").toInt()); });
@@ -45,7 +61,25 @@ static int selfTest(const QString& fixture, const QString& outDir) {
     fprintf(stdout, "RESULT %s (%d fail)\n", fails ? "FAIL" : "PASS", fails); return fails ? 1 : 0;
 }
 
+static int editDebug(const QString& in, const QString& outDir) {
+    QList<QPair<QString, QByteArray>> fonts; QFile f(QCoreApplication::applicationDirPath() + "/../Resources/fonts/edit/Sarabun-Regular.ttf"); f.open(QIODevice::ReadOnly); fonts << qMakePair(QString("Sarabun"), f.readAll());
+    for (const QString mode : {"plain", "gen", "objs-only", "move-only", "move-last", "addtext", "addtext-nogen"}) {
+        EditSession es(in, "", fonts); if (!es.ok()) { printf("open fail\n"); return 1; }
+        if (mode == "gen") { es.objects(0); es.move(0, 0, QPointF(0, 0)); }
+        if (mode == "objs-only") { es.objects(0); es.addLine(0, QPointF(10, 10), QPointF(20, 20), Qt::red, 1); }
+        if (mode == "move-only") { es.move(0, 0, QPointF(5, 0)); }
+        if (mode == "move-last") { const auto o = es.objects(0); es.move(0, o.last().index, QPointF(5, 0)); printf("objects=%d first type=%d last type=%d\n", o.size(), o.first().type, o.last().type); }
+        if (mode.startsWith("addtext")) es.addText(0, QPointF(60, 300), QString::fromUtf8("ทดสอบ Thai text"), 16, QColor("#c62828"), "Sarabun");
+        const QString o = outDir + "/dbg-" + mode + ".pdf"; es.save(o);
+        bool n; auto d = PdfDoc::open(o, "", &n); const QString t = d ? d->pageText(0) : "<open fail>";
+        if (d) d->render(0, 600).save(outDir + "/dbg-" + mode + ".png");
+        printf("%s: text chars=%d has_company=%d has_thai_added=%d\n", qPrintable(mode), t.size(), int(t.contains(QString::fromUtf8("บริษัท"))), int(t.contains(QString::fromUtf8("ทดสอบ"))));
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
+    if (argc >= 4 && QString(argv[1]) == "--editdebug") { QApplication app(argc, argv); FPDF_LIBRARY_CONFIG cfg{}; cfg.version = 2; FPDF_InitLibraryWithConfig(&cfg); QDir().mkpath(argv[3]); const int rc = editDebug(QString::fromUtf8(argv[2]), QString::fromUtf8(argv[3])); FPDF_DestroyLibrary(); return rc; }
     if (argc >= 4 && QString(argv[1]) == "--selftest") { QApplication app(argc, argv); for (const QString& f : {"NotoSansThai-Regular.ttf", "NotoSansThai-Bold.ttf"}) QFontDatabase::addApplicationFont(QCoreApplication::applicationDirPath() + "/../Resources/fonts/" + f); FPDF_LIBRARY_CONFIG cfg{}; cfg.version = 2; FPDF_InitLibraryWithConfig(&cfg); QDir().mkpath(argv[3]); const int rc = selfTest(QString::fromUtf8(argv[2]), QString::fromUtf8(argv[3])); FPDF_DestroyLibrary(); return rc; }
     QCoreApplication::setOrganizationName("oneable"); QCoreApplication::setOrganizationDomain("oneable.co.th"); QCoreApplication::setApplicationName("PDF DLP");
     App app(argc, argv);
