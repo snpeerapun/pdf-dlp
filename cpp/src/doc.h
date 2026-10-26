@@ -6,6 +6,7 @@
 #include <fpdf_text.h>
 #include <memory>
 #include <mutex>
+#include <algorithm>
 
 inline std::mutex& pdfiumLock() { static std::mutex m; return m; }
 

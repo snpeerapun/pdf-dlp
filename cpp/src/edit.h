@@ -7,6 +7,8 @@
 #include <fpdf_formfill.h>
 #include <fpdf_text.h>
 #include <map>
+#include <set>
+#include <algorithm>
 
 struct EditObject { int index = -1; int type = 0; QRectF rect; QString text; float fontSize = 0; bool subsetFont = false; QList<int> members; /* glyph objects merged into this line */ };
 
