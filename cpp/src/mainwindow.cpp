@@ -25,7 +25,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     langBox = new QComboBox; langBox->addItems({"ไทย", "EN"}); langBox->setCurrentIndex(I18n::lang() == "en" ? 1 : 0); tb->addWidget(langBox);
     settingsAct = tb->addAction(FA::icon(FA::Gear, QColor("#6f7a89")), "");
     // --- center ---
-    center = new QStackedWidget; auto* wrap = new QWidget; auto* wv = new QVBoxLayout(wrap); wv->setContentsMargins(0, 0, 0, 0); wv->setSpacing(0);
+    center = new QStackedWidget; viewer = new Viewer; auto* wrap = new QWidget; auto* wv = new QVBoxLayout(wrap); wv->setContentsMargins(0, 0, 0, 0); wv->setSpacing(0);
     auto* vbar = new QToolBar; vbar->setObjectName("viewbar"); vbar->setMovable(false); vbar->setIconSize(QSize(16, 16)); vbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     auto* leftTog = vbar->addAction(FA::icon(FA::AnglesLeft, QColor("#a3adbb"), 13), ""); leftTog->setCheckable(true); leftTog->setChecked(true); leftTog->setToolTip(TXT("sidebarLeft") + " (⌘1)");
     connect(leftTog, &QAction::toggled, this, [this, leftTog](bool on) { if (leftDock) leftDock->setVisible(on); leftTog->setIcon(FA::icon(on ? FA::AnglesLeft : FA::AnglesRight, QColor("#a3adbb"), 13)); });
@@ -43,7 +43,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     wv->addWidget(vbar);
     buildEditBar(); wv->addWidget(editbar); editbar->hide();
     home = new HomeView;
-    viewer = new Viewer; center->addWidget(home); center->addWidget(viewer); wv->addWidget(center, 1); setCentralWidget(wrap);
+    center->addWidget(home); center->addWidget(viewer); wv->addWidget(center, 1); setCentralWidget(wrap);
     // --- docks ---
     sidebar = new Sidebar; leftDock = new QDockWidget; leftDock->setWidget(sidebar); leftDock->setFeatures(QDockWidget::NoDockWidgetFeatures); leftDock->setFixedWidth(230); leftDock->setTitleBarWidget(new QWidget); addDockWidget(Qt::LeftDockWidgetArea, leftDock);
     buildToolbox();
