@@ -157,7 +157,8 @@ void EditSession::move(int page, int index, QPointF d) {
         int first = e.members.first(); double fx = 1e18; for (int mi : e.members) { FPDF_PAGEOBJECT g = FPDFPage_GetObject(p, mi); float l2, b2, r2, t2; if (g && FPDFPageObj_GetBounds(g, &l2, &b2, &r2, &t2) && l2 < fx) { fx = l2; first = mi; } }
         FPDF_PAGEOBJECT fo = FPDFPage_GetObject(p, first);
         float fs = 12; FPDFTextObj_GetFontSize(fo, &fs); FS_MATRIX m{}; FPDFPageObj_GetMatrix(fo, &m); unsigned int R = 0, G = 0, B = 0, A = 255; FPDFPageObj_GetFillColor(fo, &R, &G, &B, &A);
-        FPDF_FONT f = fontFor(QString()); if (!f) return;
+        QString fname; if (e.bold) { const QString base = fontList.isEmpty() ? QString() : fontList.first().first.section(' ', 0, 0); for (auto& fl : fontList) if (fl.first.contains("Bold", Qt::CaseInsensitive) && (fname.isEmpty() || fl.first.startsWith(base))) fname = fl.first; } // keep bold when re-typesetting
+        FPDF_FONT f = fontFor(fname); if (!f) return;
         n = FPDFPageObj_CreateTextObj(doc, f, fs); const std::u16string w = e.text.toStdU16String(); FPDFText_SetText(n, reinterpret_cast<FPDF_WIDESTRING>(w.c_str()));
         m.e += float(dx); m.f += float(dy); FPDFPageObj_SetMatrix(n, &m); FPDFPageObj_SetFillColor(n, R, G, B, A);
     } else if (e.type == FPDF_PAGEOBJ_IMAGE) {
