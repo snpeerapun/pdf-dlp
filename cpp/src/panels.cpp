@@ -5,53 +5,35 @@
 #include "core.h"
 #include "dialogs.h"
 
-static QWidget* scrollBody(QScrollArea* sa) { auto* w = new QWidget; auto* v = new QVBoxLayout(w); v->setContentsMargins(12, 12, 12, 12); v->setSpacing(12); v->setAlignment(Qt::AlignTop); sa->setWidget(w); sa->setWidgetResizable(true); sa->setFrameShape(QFrame::NoFrame); w->setStyleSheet("background:#f5f7fb;"); return w; }
+static QWidget* scrollBody(QScrollArea* sa) { auto* w = new QWidget; auto* v = new QVBoxLayout(w); v->setContentsMargins(10, 10, 10, 10); v->setSpacing(10); v->setAlignment(Qt::AlignTop); sa->setWidget(w); sa->setWidgetResizable(true); sa->setFrameShape(QFrame::NoFrame); sa->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff); w->setStyleSheet("background:#f5f7fb;"); w->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred); return w; }
 
-ToolsPanel::ToolsPanel(QWidget* parent) : QScrollArea(parent) {
-    auto* body = scrollBody(this);
-    auto* grid = new QGridLayout; grid->setSpacing(8);
-    // RGB accents per group: pages=blue, files=purple, security=red/green, marks=orange, convert=teal, misc=gray
-    const Btn defs[] = {
-        {nullptr, "merge", "merge", FA::ObjectGroup, "#7b5cff"}, {nullptr, "split", "split", FA::Scissors, "#7b5cff"}, {nullptr, "insert", "insert", FA::FileCirclePlus, "#7b5cff"},
-        {nullptr, "rotate", "rotateR", FA::RotateRight, "#4f8cff"}, {nullptr, "rotateL", "rotateL", FA::RotateLeft, "#4f8cff"}, {nullptr, "delete", "deletePages", FA::Trash, "#e5484d"},
-        {nullptr, "extract", "extract", FA::FileExport, "#4f8cff"}, {nullptr, "crop", "crop", FA::Crop, "#4f8cff"}, {nullptr, "redact", "redact", FA::Marker, "#e5484d"},
-        {nullptr, "encrypt", "encrypt", FA::Lock, "#34c77b"}, {nullptr, "decrypt", "decrypt", FA::LockOpen, "#34c77b"}, {nullptr, "sanitize", "sanitize", FA::Broom, "#34c77b"},
-        {nullptr, "watermark", "watermark", FA::Droplet, "#f4a33f"}, {nullptr, "pagenum", "pageNumbers", FA::ListOl, "#f4a33f"}, {nullptr, "props", "properties", FA::PenToSquare, "#f4a33f"},
-        {nullptr, "images", "exportImages", FA::Images, "#14b8a6"}, {nullptr, "img2pdf", "images2pdf", FA::FileImage, "#14b8a6"}, {nullptr, "compress", "compress", FA::Compress, "#14b8a6"},
-        {nullptr, "print", "print", FA::Print, "#6f7a89"},
+const QList<ToolDef>& toolDefs() {
+    static const QList<ToolDef> d = {
+        {"merge", "merge", FA::ObjectGroup, "#7b5cff", 0}, {"split", "split", FA::Scissors, "#7b5cff", 0}, {"insert", "insert", FA::FileCirclePlus, "#7b5cff", 0},
+        {"rotateL", "rotateL", FA::RotateLeft, "#4f8cff", 1}, {"rotate", "rotateR", FA::RotateRight, "#4f8cff", 1}, {"delete", "deletePages", FA::Trash, "#e5484d", 1}, {"extract", "extract", FA::FileExport, "#4f8cff", 1}, {"crop", "crop", FA::Crop, "#4f8cff", 1},
+        {"encrypt", "encrypt", FA::Lock, "#34c77b", 2}, {"decrypt", "decrypt", FA::LockOpen, "#34c77b", 2}, {"redact", "redact", FA::Marker, "#e5484d", 2}, {"sanitize", "sanitize", FA::Broom, "#34c77b", 2},
+        {"watermark", "watermark", FA::Droplet, "#f4a33f", 3}, {"pagenum", "pageNumbers", FA::ListOl, "#f4a33f", 3}, {"props", "properties", FA::PenToSquare, "#f4a33f", 3},
+        {"images", "exportImages", FA::Images, "#14b8a6", 4}, {"img2pdf", "images2pdf", FA::FileImage, "#14b8a6", 4}, {"compress", "compress", FA::Compress, "#14b8a6", 4}, {"print", "print", FA::Print, "#6f7a89", 4},
     };
-    int i = 0;
-    for (auto d : defs) {
-        auto* b = new QPushButton; b->setProperty("class", "tool"); b->setCursor(Qt::PointingHandCursor);
-        auto* v = new QVBoxLayout(b); v->setContentsMargins(4, 8, 4, 6); v->setSpacing(4);
-        auto* ic = FA::label(d.icon, QColor(d.color), 18); ic->setAlignment(Qt::AlignCenter); auto* lb = new QLabel; lb->setAlignment(Qt::AlignCenter); lb->setObjectName("toollbl"); lb->setStyleSheet("background:transparent;font-size:11.5px;"); lb->setWordWrap(true);
-        v->setContentsMargins(2, 6, 2, 4); v->setSpacing(2); v->addWidget(ic); v->addWidget(lb);
-        b->setMinimumHeight(58); b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed); grid->addWidget(b, i / 3, i % 3); i++;
-        const QString key = d.key; connect(b, &QPushButton::clicked, this, [this, key]() { emit tool(key); });
-        d.b = b; btns << d;
-    }
-    grid->setSpacing(6); static_cast<QVBoxLayout*>(body->layout())->addLayout(grid); static_cast<QVBoxLayout*>(body->layout())->setContentsMargins(10, 10, 10, 10);
-    retranslate();
+    return d;
 }
-void ToolsPanel::retranslate() { for (auto& d : btns) d.b->findChild<QLabel*>("toollbl")->setText(TXT(d.label)); }
-void ToolsPanel::setHasDoc(bool has) { for (auto& d : btns) d.b->setEnabled(has || QString(d.key) == "merge" || QString(d.key) == "img2pdf"); }
 
 /* ---------------- classification ---------------- */
 ClassifyPanel::ClassifyPanel(QWidget* parent) : QScrollArea(parent) {
     auto* body = scrollBody(this); auto* v = static_cast<QVBoxLayout*>(body->layout());
-    gCur = new QGroupBox; auto* cv = new QHBoxLayout(gCur); current = new QLabel; current->setObjectName("badge"); msipBadge = new QLabel("MSIP"); msipBadge->setObjectName("badgeInfo"); marksBadge = new QLabel; marksBadge->setObjectName("badge");
+    gCur = new QGroupBox; gCur->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); auto* cv = new QHBoxLayout(gCur); current = new QLabel; current->setObjectName("badge"); current->setWordWrap(true); current->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed); current->setMaximumWidth(220); msipBadge = new QLabel("MSIP"); msipBadge->setObjectName("badgeInfo"); marksBadge = new QLabel; marksBadge->setObjectName("badge");
     removeBtn = new QPushButton; removeBtn->setIcon(FA::icon(FA::Eraser, QColor("#6f7a89"), 14)); removeBtn->setFlat(true);
-    cv->addWidget(current); cv->addWidget(msipBadge); cv->addWidget(marksBadge); cv->addStretch(); cv->addWidget(removeBtn); v->addWidget(gCur);
-    gChoose = new QGroupBox; auto* lv = new QVBoxLayout(gChoose);
-    list = new QListWidget; list->setMinimumHeight(140); list->setIconSize(QSize(14, 14)); lv->addWidget(list);
-    auto* row = new QHBoxLayout; readWinBtn = new QPushButton; readWinBtn->setIcon(FA::icon(FA::Windows, QColor("#4f8cff"), 14, true)); learnBtn = new QPushButton; learnBtn->setIcon(FA::icon(FA::Graduation, QColor("#7b5cff"), 14)); addBtn = new QPushButton; addBtn->setIcon(FA::icon(FA::Plus, QColor("#34c77b"), 14)); addBtn->setFlat(true);
-    row->addWidget(readWinBtn); row->addWidget(learnBtn); row->addWidget(addBtn); row->addStretch(); lv->addLayout(row);
-    notes = new QLabel; notes->setObjectName("hint"); notes->setWordWrap(true); lv->addWidget(notes); v->addWidget(gChoose);
-    gMark = new QGroupBox; auto* mv = new QVBoxLayout(gMark);
-    cbHeader = new QCheckBox; cbFooter = new QCheckBox; cbWatermark = new QCheckBox; cbMsip = new QCheckBox; cbEncrypt = new QCheckBox; siteId = new QLineEdit; siteId->setPlaceholderText("00000000-0000-0000-0000-000000000000"); encPw = new QLineEdit; encPw->setEchoMode(QLineEdit::Password);
+    auto* cvv = new QVBoxLayout; auto* cr = new QHBoxLayout; cr->addWidget(current); cr->addWidget(msipBadge); cr->addWidget(marksBadge); cr->addStretch(); cvv->addLayout(cr); cvv->addWidget(removeBtn, 0, Qt::AlignLeft); cv->addLayout(cvv); v->addWidget(gCur);
+    gChoose = new QGroupBox; gChoose->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); auto* lv = new QVBoxLayout(gChoose);
+    list = new QListWidget; list->setMinimumHeight(120); list->setMaximumHeight(200); list->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); list->setIconSize(QSize(14, 14)); list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff); lv->addWidget(list);
+    readWinBtn = new QPushButton; readWinBtn->setIcon(FA::icon(FA::Windows, QColor("#4f8cff"), 14, true)); learnBtn = new QPushButton; learnBtn->setIcon(FA::icon(FA::Graduation, QColor("#7b5cff"), 14)); addBtn = new QPushButton; addBtn->setIcon(FA::icon(FA::Plus, QColor("#34c77b"), 14)); addBtn->setFlat(true); for (auto* b : {readWinBtn, learnBtn, addBtn}) b->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    lv->addWidget(readWinBtn); lv->addWidget(learnBtn); lv->addWidget(addBtn, 0, Qt::AlignLeft);
+    notes = new QLabel; notes->setObjectName("hint"); notes->setWordWrap(true); notes->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred); lv->addWidget(notes); v->addWidget(gChoose);
+    gMark = new QGroupBox; gMark->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); auto* mv = new QVBoxLayout(gMark);
+    cbHeader = new QCheckBox; cbFooter = new QCheckBox; cbWatermark = new QCheckBox; cbMsip = new QCheckBox; cbEncrypt = new QCheckBox; for (auto* c : {cbHeader, cbFooter, cbWatermark, cbMsip, cbEncrypt}) c->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); siteId = new QLineEdit; siteId->setPlaceholderText("Tenant ID"); siteId->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); encPw = new QLineEdit; encPw->setEchoMode(QLineEdit::Password); encPw->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     for (auto* c : {cbHeader, cbFooter, cbWatermark, cbMsip, cbEncrypt}) mv->addWidget(c);
     mv->addWidget(siteId); mv->addWidget(encPw);
-    auto* br = new QHBoxLayout; applyBtn = new QPushButton; applyBtn->setObjectName("primary"); applyBtn->setIcon(FA::icon(FA::Tag, Qt::white, 14)); batchBtn = new QPushButton; batchBtn->setIcon(FA::icon(FA::Layers, QColor("#4f8cff"), 14)); br->addWidget(applyBtn); br->addWidget(batchBtn); br->addStretch(); mv->addLayout(br);
+    applyBtn = new QPushButton; applyBtn->setObjectName("primary"); applyBtn->setIcon(FA::icon(FA::Tag, Qt::white, 14)); applyBtn->setMinimumHeight(34); applyBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); batchBtn = new QPushButton; batchBtn->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed); batchBtn->setIcon(FA::icon(FA::Layers, QColor("#4f8cff"), 14)); mv->addWidget(applyBtn); mv->addWidget(batchBtn);
     v->addWidget(gMark);
     load(); refreshList(); retranslate();
     QSettings s; cbHeader->setChecked(s.value("mark/header", true).toBool()); cbFooter->setChecked(s.value("mark/footer", true).toBool()); cbWatermark->setChecked(s.value("mark/watermark", false).toBool()); cbMsip->setChecked(s.value("mark/msip", true).toBool()); cbEncrypt->setChecked(s.value("mark/encrypt", false).toBool()); siteId->setText(s.value("mark/siteId").toString());
@@ -143,11 +125,11 @@ QJsonArray ClassifyPanel::buildRemoveOps(const QJsonObject& previousMeta) const 
 }
 
 /* ---------------- info ---------------- */
-InfoPanel::InfoPanel(QWidget* parent) : QScrollArea(parent) { auto* body = scrollBody(this); content = new QLabel; content->setWordWrap(true); content->setTextInteractionFlags(Qt::TextSelectableByMouse); content->setAlignment(Qt::AlignTop); static_cast<QVBoxLayout*>(body->layout())->addWidget(content); }
+InfoPanel::InfoPanel(QWidget* parent) : QScrollArea(parent) { auto* body = scrollBody(this); content = new QTextBrowser; content->setFrameShape(QFrame::NoFrame); content->setOpenExternalLinks(false); content->setLineWrapMode(QTextEdit::WidgetWidth); content->setWordWrapMode(QTextOption::WrapAnywhere); content->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff); content->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff); content->setStyleSheet("background:transparent;border:0;"); content->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding); static_cast<QVBoxLayout*>(body->layout())->addWidget(content, 1); }
 static QString esc(const QString& s) { return s.toHtmlEscaped(); }
 static QString fmtDate(const QString& v) { static const QRegularExpression re("D:(\\d{4})(\\d{2})(\\d{2})(\\d{2})?(\\d{2})?"); auto m = re.match(v); return m.hasMatch() ? QString("%1-%2-%3 %4:%5").arg(m.captured(1), m.captured(2), m.captured(3), m.captured(4).isEmpty() ? "00" : m.captured(4), m.captured(5).isEmpty() ? "00" : m.captured(5)) : v; }
 void InfoPanel::setDocument(const Document* d) {
-    if (!d) { content->setText(QString("<span style='color:#6f7a89'>%1</span>").arg(TXT("dropHint"))); return; }
+    if (!d) { content->setHtml(QString("<span style='color:#6f7a89'>%1</span>").arg(TXT("dropHint"))); return; }
     const QJsonObject m = d->info.value("metadata").toObject(); const QJsonObject msip = d->info.value("msip").toObject();
     auto row = [](const QString& k, const QString& v) { return QString("<tr><td style='color:#6f7a89;padding:2px 10px 2px 0;white-space:nowrap'>%1</td><td style='padding:2px 0'>%2</td></tr>").arg(esc(k), v); };
     QString h = "<div style='background:#fff;border:1px solid #e3e8ef;border-radius:10px;padding:10px'>";
@@ -161,5 +143,5 @@ void InfoPanel::setDocument(const Document* d) {
     h += row(TXT("path"), "<span style='font-size:11px'>" + esc(d->path) + "</span>") + "</table></div>";
     QStringList extra; for (const QString& k : m.keys()) if (k.startsWith("MSIP_") || k == "Classification" || k == "ClassificationLevel") extra << row(esc(QString(k).replace(QRegularExpression("^MSIP_Label_[0-9a-f-]+_"), "MSIP…_")), "<code>" + esc(m.value(k).toString()) + "</code>");
     if (!extra.isEmpty()) h += "<br/><div style='background:#fff;border:1px solid #e3e8ef;border-radius:10px;padding:10px'><b>Metadata</b><table style='margin-top:6px;font-size:11px'>" + extra.join("") + "</table></div>";
-    content->setText(h);
+    content->setHtml(h);
 }

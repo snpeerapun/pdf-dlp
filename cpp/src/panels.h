@@ -1,19 +1,9 @@
 #pragma once
 #include <QtWidgets>
 #include "doc.h"
-// Right dock: Tools grid · Classification · File info
-class ToolsPanel : public QScrollArea {
-    Q_OBJECT
-public:
-    explicit ToolsPanel(QWidget* parent = nullptr);
-    void setHasDoc(bool has);
-    void retranslate();
-signals:
-    void tool(const QString& key);
-private:
-    struct Btn { QPushButton* b; const char* key; const char* label; ushort icon; const char* color; };
-    QList<Btn> btns;
-};
+// Tool definitions shared by the top toolbox. group separators between groups.
+struct ToolDef { const char* key; const char* label; unsigned short icon; const char* color; int group; };
+const QList<ToolDef>& toolDefs();
 
 class ClassifyPanel : public QScrollArea {
     Q_OBJECT
@@ -41,5 +31,5 @@ public:
     explicit InfoPanel(QWidget* parent = nullptr);
     void setDocument(const Document* d);
 private:
-    QLabel* content;
+    QTextBrowser* content;
 };

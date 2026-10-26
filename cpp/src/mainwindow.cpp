@@ -35,22 +35,19 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // --- center ---
     center = new QStackedWidget; auto* wrap = new QWidget; auto* wv = new QVBoxLayout(wrap); wv->setContentsMargins(0, 0, 0, 0); wv->setSpacing(0);
     auto* rgb = new QFrame; rgb->setObjectName("rgbbar"); wv->addWidget(rgb);
-    emptyView = new QWidget; auto* ev = new QVBoxLayout(emptyView); ev->setAlignment(Qt::AlignCenter);
-    auto* dropBox = new QFrame; dropBox->setStyleSheet("QFrame{background:#fff;border:2px dashed #c5cfdc;border-radius:16px;} QLabel{border:0;background:transparent}"); auto* dv = new QVBoxLayout(dropBox); dv->setContentsMargins(56, 40, 56, 40); dv->setAlignment(Qt::AlignCenter);
-    auto* ic = FA::label(FA::FilePdf, kBlue, 48); ic->setAlignment(Qt::AlignCenter); auto* t1 = new QLabel; t1->setObjectName("dropTitle"); t1->setStyleSheet("font-size:18px;font-weight:600;"); t1->setAlignment(Qt::AlignCenter); auto* t2 = new QLabel; t2->setObjectName("dropHint"); t2->setStyleSheet("color:#6f7a89"); t2->setAlignment(Qt::AlignCenter);
-    auto* openBtn = new QPushButton; openBtn->setObjectName("primary"); openBtn->setIcon(FA::icon(FA::FolderOpen, Qt::white, 16)); dv->addWidget(ic); dv->addWidget(t1); dv->addWidget(t2); dv->addSpacing(8); dv->addWidget(openBtn, 0, Qt::AlignCenter); ev->addWidget(dropBox);
-    emptyView->setStyleSheet("background:#e4e9f0;");
-    viewer = new Viewer; center->addWidget(emptyView); center->addWidget(viewer); wv->addWidget(center, 1); setCentralWidget(wrap);
+    home = new HomeView;
+    viewer = new Viewer; center->addWidget(home); center->addWidget(viewer); wv->addWidget(center, 1); setCentralWidget(wrap);
     // --- docks ---
     sidebar = new Sidebar; leftDock = new QDockWidget; leftDock->setWidget(sidebar); leftDock->setFeatures(QDockWidget::NoDockWidgetFeatures); leftDock->setFixedWidth(230); leftDock->setTitleBarWidget(new QWidget); addDockWidget(Qt::LeftDockWidgetArea, leftDock);
-    rightTabs = new QTabWidget; tools = new ToolsPanel; classify = new ClassifyPanel; infoPanel = new InfoPanel; rightTabs->addTab(tools, ""); rightTabs->addTab(classify, ""); rightTabs->addTab(infoPanel, "");
+    buildToolbox();
+    rightTabs = new QTabWidget; classify = new ClassifyPanel; infoPanel = new InfoPanel; rightTabs->addTab(classify, ""); rightTabs->addTab(infoPanel, "");
     rightDock = new QDockWidget; rightDock->setWidget(rightTabs); rightDock->setFeatures(QDockWidget::NoDockWidgetFeatures); rightDock->setFixedWidth(330); rightDock->setTitleBarWidget(new QWidget); addDockWidget(Qt::RightDockWidgetArea, rightDock);
     setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea); setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
     statusBar()->showMessage("");
     progress = new QProgressBar; progress->setFixedWidth(160); progress->setTextVisible(false); progress->hide(); statusBar()->addPermanentWidget(progress);
     // --- wiring ---
     connect(openAct, &QAction::triggered, this, [this]() { openPaths(QFileDialog::getOpenFileNames(this, TXT("open"), QString(), "PDF (*.pdf)")); });
-    connect(openBtn, &QPushButton::clicked, openAct, &QAction::trigger);
+    connect(home, &HomeView::openRequested, openAct, &QAction::trigger); connect(home, &HomeView::fileRequested, this, [this](const QString& p) { openPaths({p}); });
     connect(saveAct, &QAction::triggered, this, &MainWindow::saveAs); connect(undoAct, &QAction::triggered, this, &MainWindow::undo); connect(settingsAct, &QAction::triggered, this, &MainWindow::showSettings);
     connect(zoomInAct, &QAction::triggered, this, [this]() { viewer->zoomStep(1); }); connect(zoomOutAct, &QAction::triggered, this, [this]() { viewer->zoomStep(-1); }); connect(fitWAct, &QAction::triggered, this, [this]() { viewer->fitWidth(); }); connect(fitPAct, &QAction::triggered, this, [this]() { viewer->fitPage(); });
     connect(prevAct, &QAction::triggered, this, [this]() { viewer->gotoPage(viewer->currentPage()); }); connect(nextAct, &QAction::triggered, this, [this]() { viewer->gotoPage(viewer->currentPage() + 2); });
@@ -69,7 +66,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         QMenu m; auto* rl = m.addAction(FA::icon(FA::RotateLeft, kBlue, 14), TXT("rotateL")); auto* rr = m.addAction(FA::icon(FA::RotateRight, kBlue, 14), TXT("rotateR")); auto* ex = m.addAction(FA::icon(FA::FileExport, kBlue, 14), TXT("extract")); m.addSeparator(); auto* del = m.addAction(FA::icon(FA::Trash, QColor("#e5484d"), 14), TXT("deletePages"));
         auto* r = m.exec(pos); if (r == rl) tool("rotateL"); else if (r == rr) tool("rotate"); else if (r == ex) tool("extract"); else if (r == del) tool("delete");
     });
-    connect(tools, &ToolsPanel::tool, this, &MainWindow::tool);
     connect(classify, &ClassifyPanel::applyRequested, this, &MainWindow::applyLabel); connect(classify, &ClassifyPanel::removeRequested, this, &MainWindow::removeLabel); connect(classify, &ClassifyPanel::batchRequested, this, &MainWindow::batchLabel);
     connect(langBox, &QComboBox::currentIndexChanged, this, [this](int i) { I18n::setLang(i == 1 ? "en" : "th"); retranslate(); });
     auto* undoSc = new QShortcut(QKeySequence::Undo, this); connect(undoSc, &QShortcut::activated, this, &MainWindow::undo);
@@ -78,12 +74,26 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     retranslate(); refreshAll();
 }
 
+void MainWindow::buildToolbox() {
+    addToolBarBreak();
+    toolbox = addToolBar("tools"); toolbox->setObjectName("toolbox"); toolbox->setMovable(false); toolbox->setIconSize(QSize(18, 18)); toolbox->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    int lastGroup = -1;
+    for (const ToolDef& d : toolDefs()) {
+        if (lastGroup >= 0 && d.group != lastGroup) toolbox->addSeparator();
+        lastGroup = d.group;
+        QAction* a = toolbox->addAction(FA::icon(d.icon, QColor(d.color), 18), TXT(d.label)); const QString key = d.key;
+        connect(a, &QAction::triggered, this, [this, key]() { tool(key); });
+        toolActs << a;
+    }
+}
+
 void MainWindow::retranslate() {
     openAct->setText(TXT("open")); saveAct->setText(TXT("saveAs")); undoAct->setText(TXT("undo")); undoAct->setToolTip("⌘Z"); settingsAct->setToolTip(TXT("settings")); zoomInAct->setToolTip(TXT("zoomIn")); zoomOutAct->setToolTip(TXT("zoomOut")); fitWAct->setToolTip(TXT("fitWidth")); fitPAct->setToolTip(TXT("fitPage"));
-    modifiedBadge->setText(TXT("modified")); rightTabs->setTabText(0, TXT("tools")); rightTabs->setTabText(1, TXT("classify")); rightTabs->setTabText(2, TXT("info"));
-    rightTabs->setTabIcon(0, FA::icon(FA::Wrench, QColor("#4f8cff"), 14)); rightTabs->setTabIcon(1, FA::icon(FA::Tag, QColor("#f4a33f"), 14)); rightTabs->setTabIcon(2, FA::icon(FA::Info, QColor("#34c77b"), 14));
-    emptyView->findChild<QLabel*>("dropTitle")->setText(TXT("dropTitle")); emptyView->findChild<QLabel*>("dropHint")->setText(TXT("dropHint")); emptyView->findChild<QPushButton*>("primary")->setText(TXT("open"));
-    sidebar->retranslate(); tools->retranslate(); classify->retranslate(); refreshAll();
+    modifiedBadge->setText(TXT("modified")); rightTabs->setTabText(0, TXT("classify")); rightTabs->setTabText(1, TXT("info"));
+    rightTabs->setTabIcon(0, FA::icon(FA::Tag, QColor("#f4a33f"), 14)); rightTabs->setTabIcon(1, FA::icon(FA::Info, QColor("#34c77b"), 14));
+    for (int i = 0; i < toolActs.size(); i++) toolActs[i]->setText(TXT(toolDefs()[i].label));
+    home->retranslate();
+    sidebar->retranslate(); classify->retranslate(); refreshAll();
 }
 void MainWindow::setBusy(const QString& text) { busyLbl->setText(text); busyLbl->setVisible(!text.isEmpty()); progress->setVisible(!text.isEmpty()); progress->setRange(0, text.isEmpty() ? 1 : 0); QApplication::processEvents(); }
 void MainWindow::toast(const QString& text, const QString& kind) { statusBar()->setStyleSheet(kind == "err" ? "color:#c62828" : kind == "warn" ? "color:#9a6400" : "color:#1b7f44"); statusBar()->showMessage(text, kind == "err" ? 9000 : 4000); }
@@ -101,6 +111,7 @@ bool MainWindow::openOne(const QString& path) {
     }
     if (!pdf) { setBusy(""); return false; }
     Document d; d.name = QFileInfo(path).fileName(); d.path = path; d.workPath = path; d.password = pw; d.pdf = pdf; d.info = Core::info(path, pw);
+    HomeView::remember(path, pdf->pages(), pdf->render(0, 186, 2.0));
     docs.push_back(std::move(d)); setActive(int(docs.size()) - 1); setBusy(""); return true;
 }
 void MainWindow::openPaths(const QStringList& paths, const QString& action) {
@@ -113,14 +124,14 @@ void MainWindow::setActive(int idx) {
     refreshAll();
 }
 void MainWindow::closeDoc(int idx) { if (idx < 0 || idx >= int(docs.size())) return; docs.erase(docs.begin() + idx); if (activeIdx >= int(docs.size())) activeIdx = int(docs.size()) - 1; refreshAll(); }
-void MainWindow::refreshFiles() { QStringList names; QList<bool> mods, chk; for (auto& d : docs) { names << d.name; mods << d.modified; chk << d.checked; } sidebar->setFiles(names, mods, chk, activeIdx); }
+void MainWindow::refreshFiles() { QStringList names, paths; QList<bool> mods, chk; for (auto& d : docs) { names << d.name; paths << d.path; mods << d.modified; chk << d.checked; } sidebar->setFiles(names, paths, mods, chk, activeIdx); }
 void MainWindow::refreshAll() {
     refreshFiles();
     Document* d = active();
     if (d) { center->setCurrentWidget(viewer); viewer->setDocument(d->pdf); sidebar->setDocument(d->pdf, d->workPath); setWindowTitle(QString("%1 — PDF DLP").arg(d->name)); }
-    else { center->setCurrentWidget(emptyView); viewer->clear(); sidebar->setDocument(nullptr, ""); setWindowTitle("PDF DLP"); pageEdit->clear(); pageTotal->setText(" / 0 "); }
+    else { home->refresh(); center->setCurrentWidget(home); viewer->clear(); sidebar->setDocument(nullptr, ""); setWindowTitle("PDF DLP"); pageEdit->clear(); pageTotal->setText(" / 0 "); }
     saveAct->setEnabled(d != nullptr); undoAct->setEnabled(d && !d->history.isEmpty()); modifiedBadge->setVisible(d && d->modified);
-    tools->setHasDoc(d != nullptr); classify->setDocument(d); infoPanel->setDocument(d);
+    for (int i = 0; i < toolActs.size(); i++) { const QString k = toolDefs()[i].key; toolActs[i]->setEnabled(d || k == "merge" || k == "img2pdf"); } classify->setDocument(d); infoPanel->setDocument(d);
 }
 void MainWindow::reloadActive(const QString& newWorkPath, const QString& password, bool modified) {
     Document* d = active(); if (!d) return;
@@ -158,7 +169,7 @@ void MainWindow::saveAs() {
     if (dest.isEmpty()) return;
     if (QFileInfo::exists(dest)) QFile::remove(dest);
     if (!QFile::copy(d->workPath, dest)) { toast(TXT("error") + ": save", "err"); return; }
-    d->path = dest; d->name = QFileInfo(dest).fileName(); d->modified = false; refreshAll(); toast(QString("%1: %2").arg(TXT("saved"), d->name));
+    d->path = dest; d->name = QFileInfo(dest).fileName(); d->modified = false; HomeView::remember(dest, d->pages(), d->pdf->render(0, 186, 2.0)); refreshAll(); toast(QString("%1: %2").arg(TXT("saved"), d->name));
 }
 QList<int> MainWindow::pagesOrCurrent() { QList<int> s = sidebar->selectedPages(); if (s.isEmpty()) s << viewer->currentPage() + 1; return s; }
 static QJsonArray arr(const QList<int>& l) { QJsonArray a; for (int v : l) a.append(v); return a; }

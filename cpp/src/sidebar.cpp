@@ -6,9 +6,9 @@
 static QThreadPool& thumbPool() { static QThreadPool p; p.setMaxThreadCount(1); return p; }
 
 Sidebar::Sidebar(QWidget* parent) : QTabWidget(parent) {
-    files = new QListWidget; files->setObjectName("files"); files->setContextMenuPolicy(Qt::CustomContextMenu); files->setIconSize(QSize(18, 18));
+    files = new QListWidget; files->setObjectName("files"); files->setContextMenuPolicy(Qt::CustomContextMenu); files->setIconSize(QSize(18, 18)); files->setTextElideMode(Qt::ElideMiddle); files->setWordWrap(false); files->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff); files->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
     auto* filesTab = new QWidget; auto* fv = new QVBoxLayout(filesTab); fv->setContentsMargins(0, 0, 0, 0); fv->setSpacing(0);
-    auto* fbar = new QWidget; auto* fh = new QHBoxLayout(fbar); fh->setContentsMargins(12, 6, 8, 6); allFiles = new QCheckBox; allFiles->setTristate(false); filesLabel = new QLabel; filesLabel->setObjectName("hint"); fh->addWidget(allFiles); fh->addWidget(filesLabel, 1);
+    auto* fbar = new QWidget; auto* fh = new QVBoxLayout(fbar); fh->setContentsMargins(12, 6, 8, 4); fh->setSpacing(2); allFiles = new QCheckBox; allFiles->setTristate(false); filesLabel = new QLabel; filesLabel->setObjectName("hint"); filesLabel->setWordWrap(true); fh->addWidget(allFiles); fh->addWidget(filesLabel);
     fv->addWidget(fbar); fv->addWidget(files, 1);
     pagesTab = new QWidget; auto* v = new QVBoxLayout(pagesTab); v->setContentsMargins(0, 0, 0, 0); v->setSpacing(0);
     auto* bar = new QWidget; auto* h = new QHBoxLayout(bar); h->setContentsMargins(10, 6, 8, 6);
@@ -30,9 +30,9 @@ Sidebar::Sidebar(QWidget* parent) : QTabWidget(parent) {
     connect(selClearBtn, &QPushButton::clicked, this, [this]() { thumbs->clearSelection(); });
 }
 void Sidebar::retranslate() { setTabText(0, TXT("files")); setTabText(1, TXT("pages")); selAllBtn->setText(TXT("selectAll")); selLabel->setText(TXT("selectPages")); allFiles->setText(TXT("selectAll")); filesLabel->setText(TXT("checkHint")); }
-void Sidebar::setFiles(const QStringList& names, const QList<bool>& modified, const QList<bool>& checked, int active) {
+void Sidebar::setFiles(const QStringList& names, const QStringList& paths, const QList<bool>& modified, const QList<bool>& checked, int active) {
     files->blockSignals(true); files->clear();
-    for (int i = 0; i < names.size(); i++) { auto* it = new QListWidgetItem(FA::icon(FA::FilePdf, QColor("#e5484d"), 18), names[i] + (modified.value(i) ? "  •" : "")); it->setFlags(it->flags() | Qt::ItemIsUserCheckable); it->setCheckState(checked.value(i) ? Qt::Checked : Qt::Unchecked); files->addItem(it); }
+    for (int i = 0; i < names.size(); i++) { auto* it = new QListWidgetItem(FA::icon(FA::FilePdf, QColor("#e5484d"), 18), names[i] + (modified.value(i) ? "  •" : "")); it->setFlags(it->flags() | Qt::ItemIsUserCheckable); it->setCheckState(checked.value(i) ? Qt::Checked : Qt::Unchecked); it->setToolTip(paths.value(i, names[i])); files->addItem(it); }
     if (active >= 0 && active < names.size()) files->setCurrentRow(active);
     files->blockSignals(false);
     const int n = checkedFiles().size(); filesLabel->setText(n ? QString("%1 %2").arg(n).arg(TXT("filesChecked")) : TXT("checkHint"));

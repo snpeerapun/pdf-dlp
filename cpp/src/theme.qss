@@ -3,6 +3,11 @@
 QMainWindow, QDialog { background: #f5f7fb; }
 QToolBar { background: #ffffff; border: 0; border-bottom: 1px solid #e3e8ef; padding: 4px 8px; spacing: 6px; }
 QToolBar QToolButton { background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 5px 9px; }
+QToolBar#toolbox { background: #fbfcfe; border-bottom: 1px solid #e3e8ef; padding: 2px 8px; spacing: 2px; }
+QToolBar#toolbox QToolButton { padding: 3px 3px 1px; font-size: 10.5px; color: #4a5566; min-width: 44px; }
+QToolBar#toolbox QToolButton:hover { background: #eef2f8; color: #1f2733; }
+QToolBar#toolbox QToolButton:disabled { color: #b7c0cc; }
+QToolBar#toolbox::separator { width: 1px; background: #e3e8ef; margin: 6px 3px; }
 QToolBar QToolButton:hover { background: #eef2f8; border-color: #dbe2ec; }
 QToolBar QToolButton#primary { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #4f8cff, stop:1 #7b5cff); color: white; font-weight: 600; }
 QToolBar QToolButton#primary:hover { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #3b74e0, stop:1 #6a4de8); }

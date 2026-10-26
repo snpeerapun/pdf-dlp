@@ -6,7 +6,7 @@ class Sidebar : public QTabWidget {
     Q_OBJECT
 public:
     explicit Sidebar(QWidget* parent = nullptr);
-    void setFiles(const QStringList& names, const QList<bool>& modified, const QList<bool>& checked, int active);
+    void setFiles(const QStringList& names, const QStringList& paths, const QList<bool>& modified, const QList<bool>& checked, int active);
     QList<int> checkedFiles() const;
     void setDocument(std::shared_ptr<PdfDoc> d, const QString& key);
     void setCurrentPage(int oneBased);
