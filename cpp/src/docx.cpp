@@ -44,8 +44,8 @@ QJsonObject extract(const PdfDoc& doc, EditSession* session) {
         for (int i = lines.size() - 1; i >= 0; i--) {
             QString t; for (const Ch& c : lines[i].chars) t += c.ch; t = t.trimmed();
             auto textOf = [&](int k) { QString u; for (const Ch& c : lines[k].chars) u += c.ch; return u; };
-            const bool dupPrev = i > 0 && t.size() <= 6 && textOf(i - 1).contains(t), dupNext = i + 1 < lines.size() && t.size() <= 6 && textOf(i + 1).contains(t);
-            if (!t.isEmpty() && (dupPrev || dupNext)) lines.removeAt(i);
+            bool dup = false; if (!t.isEmpty() && t.size() <= 6) for (int k = std::max(0, i - 3); k <= std::min(lines.size() - 1, i + 3) && !dup; k++) if (k != i && textOf(k).contains(t) && textOf(k).trimmed().size() > t.size()) dup = true;
+            if (dup) lines.removeAt(i);
         }
         std::lock_guard<std::mutex> lk(pdfiumLock());
         // ---- paragraphs ----

@@ -28,6 +28,14 @@
 - ช่องฟอร์มใหม่สร้างฝั่ง Rust (`Op::AddField`) หลัง PDFium save · กรอกฟอร์มเดิมผ่าน FORM_On* + FFLDraw
 - debug: `"PDF DLP" --editdebug <pdf> <outdir>` เรนเดอร์ 9 กรณีเทียบ · selftest มีขั้น edit
 
+## เพิ่มเติม 2026-10-26 (เย็น)
+- ค้นหาข้อความ (⌘F, `PdfDoc::search` ผ่าน FPDFText_Find*, รวมกรอบต่อคำ) · ไฮไลต์เหลือง/ส้ม · `PDFDLP_SEARCH=<คำ>` เปิดแถบค้นหาอัตโนมัติสำหรับ screenshot
+- แก้ไข: พิมพ์ในกล่อง inline บนหน้า (`Viewer::openInlineEditor`) · ย้าย/ลบได้ทุก object (path คัดลอก segment) · ปุ่ม "บันทึกการแก้ไข" = apply + เขียนทับไฟล์เดิม (สำรอง) · ยกเลิก = ทิ้ง
+- แปลงเป็น Word: `cpp/src/docx.cpp` (บรรทัดจาก EditSession::objects → ย่อหน้า/จัดกึ่งกลาง/ตัวหนา/สี + รูป) → `core/src/docx.rs` เขียน .docx · ตรวจด้วย `textutil -convert txt`
+- writeBack ต้อง atomic (copy เป็น .pdfdlp-tmp แล้ว rename) — รุ่นก่อนลบไฟล์เดิมก่อน copy ทำไฟล์หายได้
+- Windows/MSVC: `near`/`far`/`min`/`max` เป็น macro ของ windows.h → ห้ามใช้เป็นชื่อตัวแปร, ตั้ง NOMINMAX
+- ห้าม `pkill` แอปตอนเจ้าของกำลังใช้งาน — build ใหม่แล้วบอกให้เขาเปิดใหม่เอง
+
 ## บทเรียน/กับดัก
 - **lopdf**: `/Encrypt` ที่ lopdf เขียนไม่มี `/Length 256` + CF `/Length 32` → poppler/pdf.js/lopdf อ่านไม่ออก (qpdf ทน) → patch ใน `pdfops::encrypt` · เปิดไฟล์เข้ารหัสต้อง `Document::load_with_password` (`load()`+`decrypt()` ได้ objects ว่าง) · หลัง prune ต้อง `renumber_objects`
 - **Qt**: QSS `* { font-family }` ทับ `setFont()` → ไอคอน Font Awesome ใน QLabel ต้องตั้ง font-family ใน stylesheet (`FA::label`) · macro ชื่อ `T` ชน template ของ QtConcurrent → ใช้ `TXT()` · PDFium ไม่ thread-safe → ทุก FPDF_* ผ่าน `pdfiumLock()` · PDFium prebuilt install name `./libpdfium.dylib` → copy เข้า bundle + `install_name_tool` (อยู่ใน build.sh)
