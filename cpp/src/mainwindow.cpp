@@ -14,7 +14,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // --- toolbar ---
     tb = addToolBar("main"); tb->setMovable(false); tb->setIconSize(QSize(18, 18)); tb->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     auto* brand = new QWidget; auto* bl = new QHBoxLayout(brand); bl->setContentsMargins(4, 0, 10, 0); auto* logo = FA::label(FA::ShieldHalved, QColor("#7b5cff"), 18); auto* bt = new QLabel("<b>PDF DLP</b>"); bl->addWidget(logo); bl->addWidget(bt); tb->addWidget(brand);
-    openAct = tb->addAction(FA::icon(FA::FolderOpen, kBlue), ""); saveAct = tb->addAction(FA::icon(FA::Save, Qt::white), ""); undoAct = tb->addAction(FA::icon(FA::Undo, QColor("#6f7a89")), "");
+    homeAct = tb->addAction(FA::icon(FA::House, QColor("#7b5cff")), ""); openAct = tb->addAction(FA::icon(FA::FolderOpen, kBlue), ""); saveAct = tb->addAction(FA::icon(FA::Save, Qt::white), ""); undoAct = tb->addAction(FA::icon(FA::Undo, QColor("#6f7a89")), "");
     if (auto* b = qobject_cast<QToolButton*>(tb->widgetForAction(saveAct))) b->setObjectName("primary");
     modifiedBadge = new QLabel; modifiedBadge->setObjectName("badgeWarn"); modifiedBadge->hide(); tb->addWidget(modifiedBadge);
     busyLbl = new QLabel; busyLbl->setObjectName("badgeInfo"); busyLbl->hide(); tb->addWidget(busyLbl);
@@ -50,6 +50,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     progress = new QProgressBar; progress->setFixedWidth(160); progress->setTextVisible(false); progress->hide(); statusBar()->addPermanentWidget(progress);
     // --- wiring ---
     connect(openAct, &QAction::triggered, this, [this]() { openPaths(QFileDialog::getOpenFileNames(this, TXT("open"), QString(), "PDF (*.pdf)")); });
+    connect(homeAct, &QAction::triggered, this, &MainWindow::showHome);
+    // menu bar (native on macOS)
+    auto* fileMenu = menuBar()->addMenu(TXT("files")); fileMenu->setObjectName("fileMenu");
+    fileMenu->addAction(homeAct); fileMenu->addAction(openAct); fileMenu->addAction(saveAct); fileMenu->addSeparator(); fileMenu->addAction(undoAct); fileMenu->addSeparator(); fileMenu->addAction(settingsAct);
+    homeAct->setShortcut(QKeySequence("Ctrl+Shift+H")); openAct->setShortcut(QKeySequence::Open); saveAct->setShortcut(QKeySequence::SaveAs); undoAct->setShortcut(QKeySequence::Undo);
     connect(home, &HomeView::openRequested, openAct, &QAction::trigger); connect(home, &HomeView::fileRequested, this, [this](const QString& p) { openPaths({p}); });
     connect(saveAct, &QAction::triggered, this, &MainWindow::saveAs); connect(undoAct, &QAction::triggered, this, &MainWindow::undo); connect(settingsAct, &QAction::triggered, this, &MainWindow::showSettings);
     connect(zoomInAct, &QAction::triggered, this, [this]() { viewer->zoomStep(1); }); connect(zoomOutAct, &QAction::triggered, this, [this]() { viewer->zoomStep(-1); }); connect(fitWAct, &QAction::triggered, this, [this]() { viewer->fitWidth(); }); connect(fitPAct, &QAction::triggered, this, [this]() { viewer->fitPage(); });
@@ -57,7 +62,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(pageEdit, &QLineEdit::returnPressed, this, [this]() { viewer->gotoPage(pageEdit->text().toInt()); });
     connect(viewer, &Viewer::zoomChanged, this, [this](double s) { zoomLbl->setText(QString("%1%").arg(int(s * 100 + 0.5))); });
     connect(viewer, &Viewer::pageChanged, this, [this](int p, int n) { pageEdit->setText(QString::number(p)); pageTotal->setText(QString(" / %1 ").arg(n)); sidebar->setCurrentPage(p); });
-    connect(sidebar, &Sidebar::fileActivated, this, &MainWindow::setActive); connect(sidebar, &Sidebar::fileClosed, this, &MainWindow::closeDoc);
+    connect(sidebar, &Sidebar::fileActivated, this, [this](int i) { homeMode = false; setActive(i); });
+    connect(sidebar, &Sidebar::pageActivated, this, [this](int) { if (homeMode && active()) { homeMode = false; refreshAll(); } }); connect(sidebar, &Sidebar::fileClosed, this, &MainWindow::closeDoc);
     connect(sidebar, &Sidebar::fileChecked, this, [this](int i, bool on) { if (i >= 0 && i < int(docs.size())) docs[i].checked = on; });
     connect(sidebar, &Sidebar::pageActivated, this, [this](int p) { viewer->gotoPage(p); });
     connect(sidebar, &Sidebar::fileContextMenu, this, [this](int idx, QPoint pos) {
@@ -71,9 +77,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     });
     connect(classify, &ClassifyPanel::applyRequested, this, &MainWindow::applyLabel); connect(classify, &ClassifyPanel::removeRequested, this, &MainWindow::removeLabel); connect(classify, &ClassifyPanel::batchRequested, this, &MainWindow::batchLabel);
     connect(langBox, &QComboBox::currentIndexChanged, this, [this](int i) { I18n::setLang(i == 1 ? "en" : "th"); retranslate(); });
-    auto* undoSc = new QShortcut(QKeySequence::Undo, this); connect(undoSc, &QShortcut::activated, this, &MainWindow::undo);
-    auto* openSc = new QShortcut(QKeySequence::Open, this); connect(openSc, &QShortcut::activated, openAct, &QAction::trigger);
-    auto* saveSc = new QShortcut(QKeySequence::SaveAs, this); connect(saveSc, &QShortcut::activated, saveAct, &QAction::trigger);
     retranslate(); refreshAll();
 }
 
@@ -90,7 +93,9 @@ void MainWindow::buildToolbox() {
     }
 }
 
+void MainWindow::showHome() { homeMode = true; home->refresh(); center->setCurrentWidget(home); homeAct->setEnabled(false); }
 void MainWindow::retranslate() {
+    homeAct->setText(TXT("home")); if (auto* fm = findChild<QMenu*>("fileMenu")) fm->setTitle(TXT("files"));
     openAct->setText(TXT("open")); saveAct->setText(TXT("saveAs")); undoAct->setText(TXT("undo")); undoAct->setToolTip("⌘Z"); settingsAct->setToolTip(TXT("settings")); zoomInAct->setToolTip(TXT("zoomIn")); zoomOutAct->setToolTip(TXT("zoomOut")); fitWAct->setToolTip(TXT("fitWidth")); fitPAct->setToolTip(TXT("fitPage"));
     modifiedBadge->setText(TXT("modified")); rightTabs->setTabText(0, TXT("classify")); rightTabs->setTabText(1, TXT("info"));
     rightTabs->setTabIcon(0, FA::icon(FA::Tag, QColor("#f4a33f"), 14)); rightTabs->setTabIcon(1, FA::icon(FA::Info, QColor("#34c77b"), 14));
@@ -102,7 +107,7 @@ void MainWindow::setBusy(const QString& text) { busyLbl->setText(text); busyLbl-
 void MainWindow::toast(const QString& text, const QString& kind) { statusBar()->setStyleSheet(kind == "err" ? "color:#c62828" : kind == "warn" ? "color:#9a6400" : "color:#1b7f44"); statusBar()->showMessage(text, kind == "err" ? 9000 : 4000); }
 
 bool MainWindow::openOne(const QString& path) {
-    for (int i = 0; i < int(docs.size()); i++) if (docs[i].path == path) { setActive(i); return true; }
+    for (int i = 0; i < int(docs.size()); i++) if (docs[i].path == path) { homeMode = false; setActive(i); return true; }
     setBusy(TXT("loading"));
     QString pw; bool wrong = false; std::shared_ptr<PdfDoc> pdf;
     for (int tries = 0; tries < 5 && !pdf; tries++) {
@@ -123,7 +128,7 @@ void MainWindow::openPaths(const QStringList& paths, const QString& action) {
     raise(); activateWindow();
 }
 void MainWindow::setActive(int idx) {
-    if (idx < 0 || idx >= int(docs.size())) { activeIdx = -1; } else activeIdx = idx;
+    if (idx < 0 || idx >= int(docs.size())) { activeIdx = -1; } else { activeIdx = idx; homeMode = false; }
     refreshAll();
 }
 void MainWindow::closeDoc(int idx) { if (idx < 0 || idx >= int(docs.size())) return; docs.erase(docs.begin() + idx); if (activeIdx >= int(docs.size())) activeIdx = int(docs.size()) - 1; refreshAll(); }
@@ -131,8 +136,9 @@ void MainWindow::refreshFiles() { QStringList names, paths; QList<bool> mods, ch
 void MainWindow::refreshAll() {
     refreshFiles();
     Document* d = active();
-    if (d) { center->setCurrentWidget(viewer); viewer->setDocument(d->pdf); sidebar->setDocument(d->pdf, d->workPath); setWindowTitle(QString("%1 — PDF DLP").arg(d->name)); }
-    else { home->refresh(); center->setCurrentWidget(home); viewer->clear(); sidebar->setDocument(nullptr, ""); setWindowTitle("PDF DLP"); pageEdit->clear(); pageTotal->setText(" / 0 "); }
+    if (d && !homeMode) { center->setCurrentWidget(viewer); viewer->setDocument(d->pdf); sidebar->setDocument(d->pdf, d->workPath); setWindowTitle(QString("%1 — PDF DLP").arg(d->name)); }
+    else { homeMode = true; home->refresh(); center->setCurrentWidget(home); viewer->clear(); sidebar->setDocument(nullptr, ""); setWindowTitle("PDF DLP"); pageEdit->clear(); pageTotal->setText(" / 0 "); }
+    homeAct->setEnabled(!homeMode);
     saveAct->setEnabled(d != nullptr); undoAct->setEnabled(d && !d->history.isEmpty()); modifiedBadge->setVisible(d && d->modified);
     for (int i = 0; i < toolActs.size(); i++) { const QString k = toolDefs()[i].key; toolActs[i]->setEnabled(d || k == "merge" || k == "img2pdf"); } classify->setDocument(d); infoPanel->setDocument(d);
 }

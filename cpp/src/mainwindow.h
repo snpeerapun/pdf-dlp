@@ -20,13 +20,13 @@ private:
     void runOps(const QJsonArray& ops, const QString& nextPassword = QString(), bool keepPassword = true);
     void reloadActive(const QString& newWorkPath, const QString& password, bool modified);
     void openProduced(const QString& path, const QString& name, const QString& password = QString());
-    void saveAs(); void undo(); void tool(const QString& key); void retranslate(); void showSettings(); void buildToolbox();
+    void showHome(); void saveAs(); void undo(); void tool(const QString& key); void retranslate(); void showSettings(); void buildToolbox();
     QList<int> pagesOrCurrent();
     void applyLabel(); void removeLabel(); void batchLabel(); void printDoc();
     void toast(const QString& text, const QString& kind = "ok");
 
     std::vector<Document> docs; int activeIdx = -1;
     Viewer* viewer; Sidebar* sidebar; QToolBar* toolbox; QList<QAction*> toolActs; ClassifyPanel* classify; InfoPanel* infoPanel; QTabWidget* rightTabs; QDockWidget *leftDock = nullptr, *rightDock = nullptr;
-    QToolBar* tb; QAction *openAct, *saveAct, *undoAct, *settingsAct, *zoomInAct, *zoomOutAct, *fitWAct, *fitPAct, *prevAct, *nextAct; QLabel* zoomLbl; QLineEdit* pageEdit; QLabel* pageTotal; QLabel* modifiedBadge; QLabel* busyLbl; QComboBox* langBox; HomeView* home; QStackedWidget* center;
-    QProgressBar* progress;
+    QToolBar* tb; QAction *homeAct, *openAct, *saveAct, *undoAct, *settingsAct, *zoomInAct, *zoomOutAct, *fitWAct, *fitPAct, *prevAct, *nextAct; QLabel* zoomLbl; QLineEdit* pageEdit; QLabel* pageTotal; QLabel* modifiedBadge; QLabel* busyLbl; QComboBox* langBox; HomeView* home; QStackedWidget* center;
+    QProgressBar* progress; bool homeMode = true;
 };
