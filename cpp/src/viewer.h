@@ -48,6 +48,9 @@ public:
     void deleteSelected();
     bool hasSelection() const;
     int formPage = -1; // page with a focused form field
+    // search highlights
+    QList<PdfDoc::SearchHit> hits; int currentHit = -1;
+    void setSearchHits(const QList<PdfDoc::SearchHit>& h, int current); void gotoHit(int i);
 signals:
     void zoomChanged(double); void pageChanged(int, int);
     void textRequested(int page, QPointF viewerPt);

@@ -40,7 +40,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     auto* l1 = new QShortcut(QKeySequence("Ctrl+1"), this); connect(l1, &QShortcut::activated, leftTog, &QAction::toggle);
     auto* r2 = new QShortcut(QKeySequence("Ctrl+2"), this); connect(r2, &QShortcut::activated, rightTog, &QAction::toggle);
     auto* f5 = new QShortcut(QKeySequence(Qt::Key_F5), this); connect(f5, &QShortcut::activated, this, &MainWindow::present);
+    auto* sf = new QShortcut(QKeySequence::Find, this); connect(sf, &QShortcut::activated, this, &MainWindow::showSearch);
     wv->addWidget(vbar);
+    buildSearchBar(); wv->addWidget(searchbar); searchbar->hide();
     buildEditBar(); wv->addWidget(editbar); editbar->hide();
     home = new HomeView;
     center->addWidget(home); center->addWidget(viewer); wv->addWidget(center, 1); setCentralWidget(wrap);
@@ -83,6 +85,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(langBox, &QComboBox::currentIndexChanged, this, [this](int i) { I18n::setLang(i == 1 ? "en" : "th"); retranslate(); });
     retranslate(); refreshAll();
     // debug helper for screenshots: PDFDLP_START_TAB=pages[:N] opens the pages tab and selects page N
+    if (const QByteArray q = qgetenv("PDFDLP_SEARCH"); !q.isEmpty()) QTimer::singleShot(1800, this, [this, q]() { showSearch(); searchEdit->setText(QString::fromUtf8(q)); });
     if (const QByteArray t = qgetenv("PDFDLP_START_TAB"); t.startsWith("pages")) QTimer::singleShot(1500, this, [this, t]() { sidebar->setCurrentIndex(1); const int n = t.contains(':') ? t.mid(t.indexOf(':') + 1).toInt() : 0; if (n > 0) { if (auto* l = sidebar->findChild<QListWidget*>("thumbs")) if (n <= l->count()) l->item(n - 1)->setSelected(true); } });
 }
 
@@ -139,6 +142,7 @@ void MainWindow::openPaths(const QStringList& paths, const QString& action) {
 }
 void MainWindow::setActive(int idx) {
     if (idx < 0 || idx >= int(docs.size())) { activeIdx = -1; } else { activeIdx = idx; homeMode = false; }
+    if (searchbar) { viewer->setSearchHits({}, -1); if (searchbar->isVisible() && !searchEdit->text().isEmpty()) QTimer::singleShot(0, this, &MainWindow::runSearch); }
     refreshAll();
 }
 void MainWindow::closeDoc(int idx) { if (idx < 0 || idx >= int(docs.size())) return; docs.erase(docs.begin() + idx); if (activeIdx >= int(docs.size())) activeIdx = int(docs.size()) - 1; refreshAll(); }
@@ -229,6 +233,7 @@ void MainWindow::tool(const QString& key) {
     else if (key == "print") printDoc();
     else if (key == "email") emailDoc();
     else if (key == "edit") enterEdit();
+    else if (key == "search") showSearch();
     else if (key == "present") present();
 }
 
@@ -338,6 +343,38 @@ void MainWindow::buildEditBar() {
         toast(QString("%1: %2").arg(checkbox ? TXT("etCheckbox") : TXT("etField"), name));
     });
 }
+void MainWindow::buildSearchBar() {
+    searchbar = new QToolBar; searchbar->setObjectName("searchbar"); searchbar->setMovable(false); searchbar->setIconSize(QSize(14, 14));
+    auto* ic = FA::label(FA::Search, QColor("#4f8cff"), 14); ic->setContentsMargins(6, 0, 4, 0); searchbar->addWidget(ic);
+    searchEdit = new QLineEdit; searchEdit->setMinimumWidth(260); searchEdit->setPlaceholderText(TXT("searchPlaceholder")); searchEdit->setClearButtonEnabled(true); searchbar->addWidget(searchEdit);
+    searchCount = new QLabel; searchCount->setObjectName("hint"); searchCount->setMinimumWidth(80); searchCount->setAlignment(Qt::AlignCenter); searchbar->addWidget(searchCount);
+    searchPrev = searchbar->addAction(FA::icon(FA::ChevronUp, QColor("#6f7a89"), 14), ""); searchNext = searchbar->addAction(FA::icon(FA::ChevronDown, QColor("#6f7a89"), 14), "");
+    searchCase = new QCheckBox(TXT("matchCase")); searchbar->addWidget(searchCase);
+    auto* sp = new QWidget; sp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); searchbar->addWidget(sp);
+    auto* close = searchbar->addAction(FA::icon(FA::Xmark, QColor("#6f7a89"), 14), "");
+    connect(searchEdit, &QLineEdit::textChanged, this, [this]() { runSearch(); });
+    connect(searchEdit, &QLineEdit::returnPressed, this, [this]() { stepSearch(QApplication::keyboardModifiers() & Qt::ShiftModifier ? -1 : 1); });
+    connect(searchCase, &QCheckBox::toggled, this, [this]() { runSearch(); });
+    connect(searchPrev, &QAction::triggered, this, [this]() { stepSearch(-1); }); connect(searchNext, &QAction::triggered, this, [this]() { stepSearch(1); });
+    connect(close, &QAction::triggered, this, &MainWindow::closeSearch);
+    auto* esc = new QShortcut(QKeySequence(Qt::Key_Escape), searchEdit); esc->setContext(Qt::WidgetShortcut); connect(esc, &QShortcut::activated, this, &MainWindow::closeSearch);
+}
+void MainWindow::showSearch() { if (!active() || homeMode) return; searchbar->show(); searchEdit->setFocus(); searchEdit->selectAll(); if (!searchEdit->text().isEmpty()) runSearch(); }
+void MainWindow::runSearch() {
+    Document* d = active(); if (!d) return;
+    const QString q = searchEdit->text(); if (q.trimmed().isEmpty()) { viewer->setSearchHits({}, -1); searchCount->clear(); return; }
+    const auto hits = d->pdf->search(q, searchCase->isChecked());
+    int cur = -1; if (!hits.isEmpty()) { cur = 0; for (int i = 0; i < hits.size(); i++) if (hits[i].page >= viewer->currentPage()) { cur = i; break; } }
+    viewer->setSearchHits(hits, cur); if (cur >= 0) viewer->gotoHit(cur);
+    searchCount->setText(hits.isEmpty() ? TXT("noMatches") : QString("%1 / %2").arg(cur + 1).arg(hits.size()));
+    searchCount->setStyleSheet(hits.isEmpty() ? "color:#c62828" : "color:#6f7a89");
+}
+void MainWindow::stepSearch(int dir) {
+    if (viewer->hits.isEmpty()) { runSearch(); return; }
+    const int n = viewer->hits.size(); const int cur = ((viewer->currentHit + dir) % n + n) % n;
+    viewer->gotoHit(cur); searchCount->setText(QString("%1 / %2").arg(cur + 1).arg(n));
+}
+void MainWindow::closeSearch() { searchbar->hide(); viewer->setSearchHits({}, -1); viewer->setFocus(); }
 void MainWindow::enterEdit() {
     Document* d = active(); if (!d || session) return;
     session = std::make_unique<EditSession>(d->workPath, d->password, editFonts());

@@ -45,6 +45,7 @@ static QHash<QString, QPair<QString, QString>> table() { // key -> (th, en)
     add("autoDetected", "ตรวจหา label จาก MS DLP อัตโนมัติแล้ว", "Auto-detected labels from MS DLP");
     add("autoSaveLabel", "บันทึกทับไฟล์เดิมทันที (เก็บสำรองไว้ให้)", "Write back to the file immediately (backup kept)"); add("autoSaveHint", "สำรองไฟล์เดิมไว้ที่โฟลเดอร์ข้อมูลแอปก่อนเขียนทับ · ย้อนกลับได้ด้วย ⌘Z", "Original is backed up in the app data folder before overwriting · ⌘Z still undoes"); add("savedToFile", "บันทึกลงไฟล์แล้ว", "saved to file");
     add("selectPagesShort", "คลิกเลือกหน้า", "Click to select pages");
+    add("matchCase", "ตรงตัวพิมพ์", "Match case"); add("noMatches", "ไม่พบ", "No matches"); add("searchPlaceholder", "ค้นหาข้อความในเอกสาร…", "Search in document…");
     return h;
 }
 namespace I18n {

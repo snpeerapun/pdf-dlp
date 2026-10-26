@@ -13,7 +13,7 @@ const QList<ToolDef>& toolDefs() {
         {"rotateL", "rotateL", FA::RotateLeft, "#4f8cff", 1}, {"rotate", "rotateR", FA::RotateRight, "#4f8cff", 1}, {"delete", "deletePages", FA::Trash, "#e5484d", 1}, {"extract", "extract", FA::FileExport, "#4f8cff", 1}, {"crop", "crop", FA::Crop, "#4f8cff", 1},
         {"encrypt", "encrypt", FA::Lock, "#34c77b", 2}, {"decrypt", "decrypt", FA::LockOpen, "#34c77b", 2}, {"redact", "redact", FA::Marker, "#e5484d", 2}, {"sanitize", "sanitize", FA::Broom, "#34c77b", 2},
         {"watermark", "watermark", FA::Droplet, "#f4a33f", 3}, {"pagenum", "pageNumbers", FA::ListOl, "#f4a33f", 3}, {"props", "properties", FA::PenToSquare, "#f4a33f", 3},
-        {"images", "exportImages", FA::Images, "#14b8a6", 4}, {"img2pdf", "images2pdf", FA::FileImage, "#14b8a6", 4}, {"compress", "compress", FA::Compress, "#14b8a6", 4}, {"edit", "editMode", FA::Pen, "#e5484d", 5}, {"present", "present", FA::Play, "#7b5cff", 5}, {"print", "print", FA::Print, "#6f7a89", 5}, {"email", "email", FA::Envelope, "#4f8cff", 5},
+        {"images", "exportImages", FA::Images, "#14b8a6", 4}, {"img2pdf", "images2pdf", FA::FileImage, "#14b8a6", 4}, {"compress", "compress", FA::Compress, "#14b8a6", 4}, {"search", "search", FA::Search, "#4f8cff", 5}, {"edit", "editMode", FA::Pen, "#e5484d", 5}, {"present", "present", FA::Play, "#7b5cff", 5}, {"print", "print", FA::Print, "#6f7a89", 5}, {"email", "email", FA::Envelope, "#4f8cff", 5},
     };
     return d;
 }

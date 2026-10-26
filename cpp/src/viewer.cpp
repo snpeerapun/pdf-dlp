@@ -47,6 +47,10 @@ void PageWidget::paintEvent(QPaintEvent*) {
     if (!img.isNull()) { p.setRenderHint(QPainter::SmoothPixmapTransform, true); p.drawImage(rect(), img); }
     else if (wanted) { p.setPen(QColor(150, 155, 165)); p.drawText(rect(), Qt::AlignCenter, QStringLiteral("…")); }
     if (wanted && imgScale != scale) requestRender();
+    if (!viewer->hits.isEmpty()) {
+        p.setRenderHint(QPainter::Antialiasing); p.setPen(Qt::NoPen);
+        for (int i = 0; i < viewer->hits.size(); i++) { const auto& h = viewer->hits[i]; if (h.page != idx) continue; const bool cur = i == viewer->currentHit; p.setBrush(cur ? QColor(255, 140, 0, 120) : QColor(255, 220, 0, 90)); for (const QRectF& r : h.rects) p.drawRoundedRect(QRectF(r.topLeft() * scale, r.size() * scale), 2, 2); if (cur) { p.setPen(QPen(QColor("#ff8c00"), 1.5)); p.setBrush(Qt::NoBrush); for (const QRectF& r : h.rects) p.drawRoundedRect(QRectF(r.topLeft() * scale, r.size() * scale), 2, 2); p.setPen(Qt::NoPen); } }
+    }
     if (!viewer->edit.session) return;
     p.setRenderHint(QPainter::Antialiasing);
     auto rectOf = [&](const EditObject& e) { return QRectF(e.rect.topLeft() * scale, e.rect.size() * scale); };
@@ -135,6 +139,13 @@ void Viewer::setDocument(std::shared_ptr<PdfDoc> d) {
     clear(); doc = d; if (!d) return;
     for (int i = 0; i < d->pages(); i++) { auto* pw = new PageWidget(d, i, this, content); pw->setStyleSheet("background:white;"); pages.push_back(pw); vbox->addWidget(pw, 0, Qt::AlignHCenter); }
     relayout();
+}
+void Viewer::setSearchHits(const QList<PdfDoc::SearchHit>& h, int current) { hits = h; currentHit = current; for (auto* p : pages) p->update(); }
+void Viewer::gotoHit(int i) {
+    if (i < 0 || i >= hits.size() || pages.empty()) return;
+    currentHit = i; const auto& h = hits[i]; PageWidget* pw = pages[std::clamp(h.page, 0, int(pages.size()) - 1)];
+    const double y = pw->geometry().top() + h.rects.first().top() * sc - viewport()->height() * 0.35;
+    verticalScrollBar()->setValue(int(std::max(0.0, y))); for (auto* p : pages) p->update(); wantTimer.start();
 }
 void Viewer::setEditSession(EditSession* s) { edit.session = s; formPage = -1; for (auto* p : pages) { p->selected = -1; p->invalidate(); } emit selectionChanged(); }
 void Viewer::refreshPage(int page) { if (page >= 0 && page < int(pages.size())) pages[page]->invalidate(); }

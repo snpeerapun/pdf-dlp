@@ -27,6 +27,7 @@ private:
     QList<int> pagesOrCurrent();
     void applyLabel(); void removeLabel(); void batchLabel(); void printDoc(); void emailDoc();
     void buildEditBar(); void enterEdit(); void finishEdit(bool save); void present();
+    void buildSearchBar(); void showSearch(); void runSearch(); void stepSearch(int dir); void closeSearch();
     QList<QPair<QString, QByteArray>> editFonts();
     void toast(const QString& text, const QString& kind = "ok");
 
@@ -34,5 +35,5 @@ private:
     Viewer* viewer; Sidebar* sidebar; QToolBar* toolbox; QList<QAction*> toolActs; ClassifyPanel* classify; InfoPanel* infoPanel; QTabWidget* rightTabs; QDockWidget *leftDock = nullptr, *rightDock = nullptr;
     QToolBar* tb; QAction *homeAct, *openAct, *saveAct, *undoAct, *settingsAct, *zoomInAct, *zoomOutAct, *fitWAct, *fitPAct, *prevAct, *nextAct; QLabel* zoomLbl; QLineEdit* pageEdit; QLabel* pageTotal; QLabel* modifiedBadge; QLabel* busyLbl; QComboBox* langBox; HomeView* home; QStackedWidget* center;
     QProgressBar* progress; bool homeMode = true;
-    QToolBar* editbar = nullptr; std::unique_ptr<EditSession> session; QJsonArray pendingFieldOps; QActionGroup* editTools = nullptr; QComboBox* fontBox = nullptr; QDoubleSpinBox* sizeBox = nullptr; QDoubleSpinBox* strokeBox = nullptr; QPushButton* colorBtn = nullptr; QPushButton* fillBtn = nullptr; QCheckBox* fillChk = nullptr; QAction* delAct = nullptr; QList<QAction*> editToolActs;
+    QToolBar* editbar = nullptr; QToolBar* searchbar = nullptr; QLineEdit* searchEdit = nullptr; QLabel* searchCount = nullptr; QCheckBox* searchCase = nullptr; QAction *searchPrev = nullptr, *searchNext = nullptr; std::unique_ptr<EditSession> session; QJsonArray pendingFieldOps; QActionGroup* editTools = nullptr; QComboBox* fontBox = nullptr; QDoubleSpinBox* sizeBox = nullptr; QDoubleSpinBox* strokeBox = nullptr; QPushButton* colorBtn = nullptr; QPushButton* fillBtn = nullptr; QCheckBox* fillChk = nullptr; QAction* delAct = nullptr; QList<QAction*> editToolActs;
 };

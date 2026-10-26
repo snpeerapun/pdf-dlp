@@ -6,6 +6,8 @@ QToolBar QToolButton { background: transparent; border: 1px solid transparent; b
 QToolBar#viewbar { background: #ffffff; border: 0; border-bottom: 1px solid #e3e8ef; padding: 0 6px; spacing: 2px; min-height: 40px; max-height: 40px; }
 QToolBar#viewbar QLineEdit { min-height: 24px; max-height: 24px; padding: 0 4px; }
 QToolBar#rgbstrip, QToolBar#rgbtop { background: transparent; border: 0; padding: 0; margin: 0; spacing: 0; }
+QToolBar#searchbar { background: #fffbe6; border: 0; border-bottom: 1px solid #f2e3a0; padding: 0 6px; spacing: 4px; min-height: 38px; max-height: 38px; }
+QToolBar#searchbar QLineEdit { min-height: 24px; max-height: 24px; }
 QToolBar#editbar { background: #fff8f8; border: 0; border-bottom: 1px solid #f3d6d6; padding: 0 6px; spacing: 2px; min-height: 40px; max-height: 40px; }
 QToolBar#editbar QToolButton { padding: 3px 7px; }
 QToolBar#editbar QToolButton:checked { background: #fde2e2; color: #c62828; }
