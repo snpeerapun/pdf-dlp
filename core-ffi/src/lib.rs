@@ -31,6 +31,9 @@ fn j<T: serde::Serialize>(t: T) -> Result<serde_json::Value, String> { serde_jso
     out(pdfcore::pdfops::parse_ranges(&arg(spec), total).map(|p| serde_json::json!({ "pages": p })))
 }
 #[unsafe(no_mangle)] pub extern "C" fn pdfcore_discover_labels() -> *mut c_char { out(j(pdfcore::labels::discover_local())) }
+#[unsafe(no_mangle)] pub extern "C" fn pdfcore_prepare_export(path: *const c_char, password: *const c_char) -> *mut c_char {
+    out(pdfcore::prepare_export(&arg(path), &arg(password)).map(|p| serde_json::json!({ "path": p })))
+}
 #[unsafe(no_mangle)] pub extern "C" fn pdfcore_labels_from_file(path: *const c_char, password: *const c_char) -> *mut c_char {
     out(pdfcore::labels_from_file(&arg(path), &arg(password)).map(|l| serde_json::json!({ "labels": l })))
 }

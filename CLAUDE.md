@@ -32,6 +32,11 @@
 - ค้นหาข้อความ (⌘F, `PdfDoc::search` ผ่าน FPDFText_Find*, รวมกรอบต่อคำ) · ไฮไลต์เหลือง/ส้ม · `PDFDLP_SEARCH=<คำ>` เปิดแถบค้นหาอัตโนมัติสำหรับ screenshot
 - แก้ไข: พิมพ์ในกล่อง inline บนหน้า (`Viewer::openInlineEditor`) · ย้าย/ลบได้ทุก object (path คัดลอก segment) · ปุ่ม "บันทึกการแก้ไข" = apply + เขียนทับไฟล์เดิม (สำรอง) · ยกเลิก = ทิ้ง
 - แปลงเป็น Word: `cpp/src/docx.cpp` (บรรทัดจาก EditSession::objects → ย่อหน้า/จัดกึ่งกลาง/ตัวหนา/สี + รูป) → `core/src/docx.rs` เขียน .docx · ตรวจด้วย `textutil -convert txt`
+- แปลง Word ตรวจกับ MS Word จริงแล้ว (2026-10-26 เย็น): ไม่ขึ้น Compatibility Mode (settings.xml compat 15) · ตัวหนา/ขนาดจริง/ตารางมีเส้น ✓
+  · PDFium คืนชื่อฟอนต์ว่างสำหรับ Type3 (Chrome/Skia) → `pdfcore_prepare_export` ทำสำเนาชั่วคราว mirror FontDescriptor /FontName → /BaseFont ก่อนเปิด EditSession
+  · ขนาดฟอนต์จริง = FPDFTextObj_GetFontSize × sqrt(det(FPDFPageObj_GetMatrix)) (Skia ใส่ scale 0.75 ไว้ใน CTM) · line builder แยกบรรทัดเมื่อ bold ต่างกัน
+  · `docx.cpp` จัดกลุ่ม "แถว" (บรรทัดซ้อนแนวตั้ง) → ตารางเมื่อ ≥2 แถวติดกันมี ≥2 เซลล์ซ้าย-ตรงกัน (เส้นขอบถ้ามี path บาง ๆ ทับ) · แถวเดียวหลายเซลล์ = tab stops
+  · debug: `"PDF DLP" --docxjson <pdf>` พิมพ์ JSON ที่ส่งให้ Rust · `PDFDLP_DEBUG_FONTS=1` พิมพ์ฟอนต์ต่อ object
 - writeBack ต้อง atomic (copy เป็น .pdfdlp-tmp แล้ว rename) — รุ่นก่อนลบไฟล์เดิมก่อน copy ทำไฟล์หายได้
 - Windows/MSVC: `near`/`far`/`min`/`max` เป็น macro ของ windows.h → ห้ามใช้เป็นชื่อตัวแปร, ตั้ง NOMINMAX
 - ห้าม `pkill` แอปตอนเจ้าของกำลังใช้งาน — build ใหม่แล้วบอกให้เขาเปิดใหม่เอง

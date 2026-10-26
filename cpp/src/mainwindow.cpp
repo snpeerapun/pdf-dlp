@@ -241,7 +241,7 @@ void MainWindow::tool(const QString& key) {
     else if (key == "search") showSearch();
     else if (key == "docx") {
         const QString dest = QFileDialog::getSaveFileName(this, TXT("toWord"), QFileInfo(d->path.contains('/') ? d->path : QDir::homePath() + "/" + d->name).path() + "/" + QFileInfo(d->name).completeBaseName() + ".docx", "Word (*.docx)"); if (dest.isEmpty()) return;
-        setBusy(TXT("toWord")); EditSession es(d->workPath, d->password, editFonts()); const QJsonObject j = DocxExport::extract(*d->pdf, es.ok() ? &es : nullptr); const QJsonObject r = Core::writeDocx(j, dest); setBusy("");
+        setBusy(TXT("toWord")); const QJsonObject prep = Core::prepareExport(d->workPath, d->password); const QString prepPath = prep.value("ok").toBool() ? prep.value("path").toString() : d->workPath; QJsonObject r; { EditSession es(prepPath, prep.value("ok").toBool() ? QString() : d->password, editFonts()); const QJsonObject j = DocxExport::extract(*d->pdf, es.ok() ? &es : nullptr); r = Core::writeDocx(j, dest); } if (prepPath != d->workPath) QFile::remove(prepPath); setBusy("");
         if (r.value("ok").toBool()) { toast(QString("%1: %2").arg(TXT("wordSaved"), QFileInfo(dest).fileName())); QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(dest).absolutePath())); } else toast(r.value("error").toString(), "err");
     }
     else if (key == "present") present();

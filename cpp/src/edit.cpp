@@ -1,4 +1,5 @@
 #include "edit.h"
+#include <cmath>
 #include "doc.h"
 #include <fpdf_save.h>
 #include <fpdf_fwlevent.h>
@@ -64,8 +65,8 @@ QList<EditObject> EditSession::objects(int page) {
         if (e.type == FPDF_PAGEOBJ_TEXT) {
             const unsigned long len = FPDFTextObj_GetText(o, tp, nullptr, 0);
             if (len > 0) { std::vector<unsigned short> buf(len / 2 + 1); FPDFTextObj_GetText(o, tp, buf.data(), len); e.text = QString::fromUtf16(reinterpret_cast<const char16_t*>(buf.data())); }
-            float fs = 0; FPDFTextObj_GetFontSize(o, &fs); e.fontSize = fs;
-            if (FPDF_FONT f = FPDFTextObj_GetFont(o)) { char name[128] = {0}; FPDFFont_GetBaseFontName(f, name, sizeof(name)); const QString nm = QString(name); e.subsetFont = nm.contains('+'); int wt = FPDFFont_GetWeight(f); e.bold = wt >= 600 || nm.contains("Bold", Qt::CaseInsensitive); }
+            float fs = 0; FPDFTextObj_GetFontSize(o, &fs); FS_MATRIX m{1, 0, 0, 1, 0, 0}; FPDFPageObj_GetMatrix(o, &m); const double sc = std::sqrt(std::abs(double(m.a) * m.d - double(m.b) * m.c)); e.fontSize = float(fs * (sc > 0.01 && sc < 100 ? sc : 1.0)); // effective size in points (Skia PDFs put the scale in the matrix)
+            if (FPDF_FONT f = FPDFTextObj_GetFont(o)) { char name[128] = {0}; FPDFFont_GetBaseFontName(f, name, sizeof(name)); const QString nm = QString(name); e.subsetFont = nm.contains('+'); int wt = FPDFFont_GetWeight(f); char fam[128] = {0}; FPDFFont_GetFamilyName(f, fam, sizeof(fam)); const int flags = FPDFFont_GetFlags(f); e.bold = wt >= 600 || nm.contains("Bold", Qt::CaseInsensitive) || QString(fam).contains("Bold", Qt::CaseInsensitive) || (flags & (1 << 18)); static const bool dbg = qEnvironmentVariableIsSet("PDFDLP_DEBUG_FONTS"); if (dbg) fprintf(stderr, "obj %d size=%.2f base='%s' fam='%s' wt=%d flags=%d h=%.2f text='%s'\n", i, fs, name, fam, wt, flags, e.rect.height(), e.text.left(12).toUtf8().constData()); }
             unsigned int R = 0, G = 0, B = 0, A = 255; if (FPDFPageObj_GetFillColor(o, &R, &G, &B, &A)) e.color = QString("#%1%2%3").arg(R, 2, 16, QChar('0')).arg(G, 2, 16, QChar('0')).arg(B, 2, 16, QChar('0'));
         }
         if (e.rect.width() < 0.3 && e.rect.height() < 0.3) continue;
@@ -86,6 +87,7 @@ QList<EditObject> EditSession::objects(int page) {
             if (mark) { if (g.rect.bottom() < L.obj.rect.top() - hh * 0.9 || g.rect.top() > L.obj.rect.bottom() + hh * 0.5) continue; }
             else if (overlap < std::min(L.obj.rect.height(), g.rect.height()) * 0.4) continue;         // not on the same line
             if (std::abs(L.obj.fontSize - g.fontSize) > 0.01 + L.obj.fontSize * 0.3) continue;           // different size = different run
+            if (L.obj.bold != g.bold) continue;                                                             // bold vs regular = different run
             const double gap = g.rect.left() - L.obj.rect.right();
             if (gap > hh * 1.6 || g.rect.right() < L.obj.rect.left() - hh * 1.6) continue;
             if (std::abs(gap) < bestGap) { bestGap = std::abs(gap); best = &L; }

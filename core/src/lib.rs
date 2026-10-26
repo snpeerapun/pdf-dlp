@@ -84,6 +84,32 @@ pub fn images_to_pdf(paths: Vec<String>, fit_a4: bool, out: Option<&str>) -> Res
     Ok(ApplyOut { path: dest.display().to_string(), pages: doc.get_pages().len() as u32 })
 }
 
+/// Copy for text export: PDFium reports an empty font name for Type3 fonts (Chrome/Skia PDFs keep the
+/// name under /Name, not /BaseFont), which hides bold/italic. Mirror /Name into /BaseFont in a temp copy.
+pub fn prepare_export(path: &str, password: &str) -> Result<String, String> {
+    let p = Path::new(path);
+    let mut doc = pdfops::load(p, password)?;
+    // Type3 font dicts carry no /BaseFont; the name lives in /Name or in the FontDescriptor's /FontName.
+    let mut fixes: Vec<(lopdf::ObjectId, lopdf::Object)> = vec![];
+    for (id, obj) in doc.objects.iter() {
+        if let lopdf::Object::Dictionary(d) = obj {
+            let is_t3 = d.get(b"Subtype").ok().and_then(|o| o.as_name().ok()) == Some(b"Type3");
+            if !is_t3 || d.get(b"BaseFont").is_ok() { continue; }
+            let mut name = d.get(b"Name").ok().cloned();
+            if name.is_none() {
+                if let Ok(fd) = d.get(b"FontDescriptor").and_then(|o| o.as_reference()) {
+                    if let Ok(fdd) = doc.get_dictionary(fd) { name = fdd.get(b"FontName").ok().cloned(); }
+                }
+            }
+            if let Some(n) = name { fixes.push((*id, n)); }
+        }
+    }
+    for (id, n) in fixes { if let Ok(d) = doc.get_dictionary_mut(id) { d.set("BaseFont", n); } }
+    let dest = temp_out(&format!("{}-export", p.file_stem().and_then(|s| s.to_str()).unwrap_or("document")));
+    pdfops::save(&mut doc, &dest)?;
+    Ok(dest.display().to_string())
+}
+
 pub fn labels_from_file(path: &str, password: &str) -> Result<Vec<labels::Label>, String> {
     let p = Path::new(path);
     if path.to_lowercase().ends_with(".pdf") {

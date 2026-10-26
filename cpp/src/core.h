@@ -15,6 +15,7 @@ QJsonObject labelsFromFile(const QString& path, const QString& password = {});
 QJsonObject msipMetadata(const QJsonObject& label, const QString& siteId, unsigned bits, const QString& owner, const QJsonObject& previous);
 QString newGuid();
 QJsonObject writeDocx(const QJsonObject& doc, const QString& outPath);
+QJsonObject prepareExport(const QString& path, const QString& password = {}); // {path}: temp copy for text export
 QJsonObject shell(const QString& action, const QJsonArray& items = {});
 /// Run `fn` on a worker thread; `done` is invoked on the UI thread.
 void async(std::function<QJsonObject()> fn, std::function<void(QJsonObject)> done);
