@@ -8,7 +8,7 @@ constexpr ushort FolderOpen = 0xf07c, Save = 0xf0c7, Undo = 0xf0e2, Gear = 0xf01
     ObjectGroup = 0xf247, Scissors = 0xf0c4, FileCirclePlus = 0xe494, RotateRight = 0xf2f9, RotateLeft = 0xf2ea, Trash = 0xf2ed, FileExport = 0xf56e,
     Lock = 0xf023, LockOpen = 0xf3c1, Marker = 0xf5a1, Droplet = 0xf043, ListOl = 0xf0cb, Crop = 0xf565, Images = 0xf302, FileImage = 0xf1c5,
     Compress = 0xf066, Broom = 0xf51a, PenToSquare = 0xf044, Print = 0xf02f, Tag = 0xf02b, Info = 0xf05a, Wrench = 0xf7d9, Clone = 0xf24d,
-    Stamp = 0xf5bf, Eraser = 0xf12d, Windows = 0xf17a, Graduation = 0xf19d, Layers = 0xf5fd, Copy = 0xf0c5, Search = 0xf002, ShieldHalved = 0xf3ed, Circle = 0xf111, House = 0xf015;
+    Stamp = 0xf5bf, Eraser = 0xf12d, Windows = 0xf17a, Graduation = 0xf19d, Layers = 0xf5fd, Copy = 0xf0c5, Search = 0xf002, ShieldHalved = 0xf3ed, Circle = 0xf111, House = 0xf015, AnglesLeft = 0xf100, AnglesRight = 0xf101, SidebarL = 0xe4ef, SidebarR = 0xe4f0, Envelope = 0xf0e0;
 
 inline QString font() { return QStringLiteral("Font Awesome 6 Free"); }
 inline QIcon icon(ushort code, const QColor& color, int px = 18, bool brands = false) {

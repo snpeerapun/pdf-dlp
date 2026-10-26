@@ -22,7 +22,7 @@ private:
     void openProduced(const QString& path, const QString& name, const QString& password = QString());
     void showHome(); void saveAs(); void undo(); void tool(const QString& key); void retranslate(); void showSettings(); void buildToolbox();
     QList<int> pagesOrCurrent();
-    void applyLabel(); void removeLabel(); void batchLabel(); void printDoc();
+    void applyLabel(); void removeLabel(); void batchLabel(); void printDoc(); void emailDoc();
     void toast(const QString& text, const QString& kind = "ok");
 
     std::vector<Document> docs; int activeIdx = -1;

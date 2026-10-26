@@ -3,7 +3,8 @@
 QMainWindow, QDialog { background: #f5f7fb; }
 QToolBar { background: #ffffff; border: 0; border-bottom: 1px solid #e3e8ef; padding: 4px 8px; spacing: 6px; }
 QToolBar QToolButton { background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 5px 9px; }
-QToolBar#viewbar { background: #ffffff; border: 0; border-bottom: 1px solid #e3e8ef; padding: 2px 8px; spacing: 4px; min-height: 34px; }
+QToolBar#viewbar { background: #ffffff; border: 0; border-bottom: 1px solid #e3e8ef; padding: 0 8px; spacing: 4px; min-height: 40px; max-height: 40px; }
+QToolBar#rgbstrip { background: transparent; border: 0; padding: 0; margin: 0; spacing: 0; }
 QToolBar#viewbar QToolButton { padding: 4px 6px; }
 QToolBar#viewbar::separator { width: 1px; background: #e3e8ef; margin: 6px 6px; }
 QToolBar#toolbox { background: #fbfcfe; border-bottom: 1px solid #e3e8ef; padding: 2px 8px; spacing: 2px; }
@@ -17,7 +18,9 @@ QToolBar QToolButton#primary:hover { background: qlineargradient(x1:0,y1:0,x2:1,
 QDockWidget { background: #ffffff; titlebar-close-icon: none; titlebar-normal-icon: none; }
 QDockWidget::title { background: #ffffff; padding: 0; height: 0; }
 QTabWidget::pane { border: 0; background: #ffffff; }
-QTabBar::tab { background: transparent; padding: 9px 12px; border-bottom: 2px solid transparent; color: #6f7a89; font-weight: 500; }
+QTabBar::tab { background: transparent; padding: 0 12px; height: 38px; border-bottom: 2px solid transparent; color: #6f7a89; font-weight: 500; }
+QTabWidget::tab-bar { alignment: center; }
+QTabBar { background: #ffffff; border-bottom: 1px solid #e3e8ef; }
 QTabBar::tab:selected { color: #1f2733; border-bottom-color: #4f8cff; }
 QTabBar::tab:hover { color: #1f2733; }
 QScrollArea { border: 0; }
@@ -58,4 +61,4 @@ QStatusBar { background: #ffffff; border-top: 1px solid #e3e8ef; color: #6f7a89;
 QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; } QScrollBar::handle:vertical { background: #c5cfdc; border-radius: 4px; min-height: 30px; } QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
 QScrollBar:horizontal { background: transparent; height: 10px; margin: 2px; } QScrollBar::handle:horizontal { background: #c5cfdc; border-radius: 4px; min-width: 30px; }
 QProgressBar { border: 0; background: #e3e8ef; border-radius: 3px; height: 6px; text-align: center; } QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #ff5f6d, stop:0.5 #ffc371, stop:1 #4f8cff); border-radius: 3px; }
-QFrame#rgbbar { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #ff5f6d, stop:0.25 #ffc371, stop:0.5 #34c77b, stop:0.75 #4f8cff, stop:1 #7b5cff); max-height: 3px; min-height: 3px; }
+QFrame#rgbbar { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #ff5f6d, stop:0.25 #ffc371, stop:0.5 #34c77b, stop:0.75 #4f8cff, stop:1 #7b5cff); max-height: 3px; min-height: 3px; border: 0; }

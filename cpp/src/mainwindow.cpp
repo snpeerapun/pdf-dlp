@@ -23,18 +23,17 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     settingsAct = tb->addAction(FA::icon(FA::Gear, QColor("#6f7a89")), "");
     // --- center ---
     center = new QStackedWidget; auto* wrap = new QWidget; auto* wv = new QVBoxLayout(wrap); wv->setContentsMargins(0, 0, 0, 0); wv->setSpacing(0);
-    auto* rgb = new QFrame; rgb->setObjectName("rgbbar"); wv->addWidget(rgb);
     auto* vbar = new QToolBar; vbar->setObjectName("viewbar"); vbar->setMovable(false); vbar->setIconSize(QSize(16, 16)); vbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    auto* leftTog = vbar->addAction(FA::icon(FA::Columns, QColor("#6f7a89"), 16), ""); leftTog->setCheckable(true); leftTog->setChecked(true); leftTog->setToolTip("⌘1");
-    connect(leftTog, &QAction::toggled, this, [this](bool on) { if (leftDock) leftDock->setVisible(on); });
+    auto* leftTog = vbar->addAction(FA::icon(FA::AnglesLeft, QColor("#6f7a89"), 15), ""); leftTog->setCheckable(true); leftTog->setChecked(true); leftTog->setToolTip(TXT("sidebarLeft") + " (⌘1)");
+    connect(leftTog, &QAction::toggled, this, [this, leftTog](bool on) { if (leftDock) leftDock->setVisible(on); leftTog->setIcon(FA::icon(on ? FA::AnglesLeft : FA::AnglesRight, QColor("#6f7a89"), 15)); });
     auto* vsp = new QWidget; vsp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); vbar->addWidget(vsp);
     prevAct = vbar->addAction(FA::icon(FA::ChevronUp, QColor("#6f7a89"), 16), ""); pageEdit = new QLineEdit; pageEdit->setFixedWidth(46); pageEdit->setAlignment(Qt::AlignCenter); vbar->addWidget(pageEdit); pageTotal = new QLabel(" / 0 "); vbar->addWidget(pageTotal); nextAct = vbar->addAction(FA::icon(FA::ChevronDown, QColor("#6f7a89"), 16), "");
     vbar->addSeparator();
     zoomOutAct = vbar->addAction(FA::icon(FA::Minus, QColor("#6f7a89"), 16), ""); zoomLbl = new QLabel(" 100% "); zoomLbl->setFixedWidth(52); zoomLbl->setAlignment(Qt::AlignCenter); vbar->addWidget(zoomLbl); zoomInAct = vbar->addAction(FA::icon(FA::Plus, QColor("#6f7a89"), 16), "");
     fitWAct = vbar->addAction(FA::icon(FA::ArrowsLR, QColor("#6f7a89"), 16), ""); fitPAct = vbar->addAction(FA::icon(FA::Expand, QColor("#6f7a89"), 16), "");
     auto* vsp2 = new QWidget; vsp2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); vbar->addWidget(vsp2);
-    auto* rightTog = vbar->addAction(FA::icon(FA::Sliders, QColor("#6f7a89"), 16), ""); rightTog->setCheckable(true); rightTog->setChecked(true); rightTog->setToolTip("⌘2");
-    connect(rightTog, &QAction::toggled, this, [this](bool on) { if (rightDock) rightDock->setVisible(on); });
+    auto* rightTog = vbar->addAction(FA::icon(FA::AnglesRight, QColor("#6f7a89"), 15), ""); rightTog->setCheckable(true); rightTog->setChecked(true); rightTog->setToolTip(TXT("sidebarRight") + " (⌘2)");
+    connect(rightTog, &QAction::toggled, this, [this, rightTog](bool on) { if (rightDock) rightDock->setVisible(on); rightTog->setIcon(FA::icon(on ? FA::AnglesRight : FA::AnglesLeft, QColor("#6f7a89"), 15)); });
     auto* l1 = new QShortcut(QKeySequence("Ctrl+1"), this); connect(l1, &QShortcut::activated, leftTog, &QAction::toggle);
     auto* r2 = new QShortcut(QKeySequence("Ctrl+2"), this); connect(r2, &QShortcut::activated, rightTog, &QAction::toggle);
     wv->addWidget(vbar);
@@ -83,6 +82,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 void MainWindow::buildToolbox() {
     addToolBarBreak();
     toolbox = addToolBar("tools"); toolbox->setObjectName("toolbox"); toolbox->setMovable(false); toolbox->setIconSize(QSize(18, 18)); toolbox->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    addToolBarBreak();
+    auto* strip = addToolBar("rgb"); strip->setObjectName("rgbstrip"); strip->setMovable(false); strip->setFixedHeight(3); strip->setContentsMargins(0, 0, 0, 0);
+    auto* rgb = new QFrame; rgb->setObjectName("rgbbar"); rgb->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed); strip->addWidget(rgb);
     int lastGroup = -1;
     for (const ToolDef& d : toolDefs()) {
         if (lastGroup >= 0 && d.group != lastGroup) toolbox->addSeparator();
@@ -206,6 +208,7 @@ void MainWindow::tool(const QString& key) {
     else if (key == "props") { if (Dialogs::properties(this, *d, ops)) runOps(ops); }
     else if (key == "redact") { if (Dialogs::redact(this, *d, viewer->currentPage() + 1, ops)) runOps(ops); }
     else if (key == "print") printDoc();
+    else if (key == "email") emailDoc();
 }
 
 void MainWindow::applyLabel() {
@@ -250,6 +253,29 @@ void MainWindow::printDoc() {
         const QRect page = printer.pageRect(QPrinter::DevicePixel).toRect(); QImage img = d->pdf->render(i, page.width());
         const QSize sz = img.size().scaled(page.size(), Qt::KeepAspectRatio); p.drawImage(QRect(page.topLeft(), sz), img);
     }
+}
+/// Open the default mail client (Outlook preferred) with the current version of the document attached.
+void MainWindow::emailDoc() {
+    Document* d = active(); if (!d) return;
+    // attach a copy carrying the real file name (work copies live in temp with a timestamp suffix)
+    const QString dir = QDir::tempPath() + "/pdfdlp/mail"; QDir().mkpath(dir);
+    const QString att = dir + "/" + d->name; QFile::remove(att);
+    if (!QFile::copy(d->workPath, att)) { toast(TXT("error") + ": copy", "err"); return; }
+    const QString subject = QFileInfo(d->name).completeBaseName() + (d->classification().isEmpty() ? QString() : QString(" [%1]").arg(d->classification()));
+#ifdef Q_OS_MAC
+    const bool hasOutlook = QFileInfo::exists("/Applications/Microsoft Outlook.app");
+    QString script = hasOutlook
+        ? QString("tell application \"Microsoft Outlook\"\nactivate\nset m to make new outgoing message with properties {subject:\"%1\"}\nmake new attachment at m with properties {file:POSIX file \"%2\"}\nopen m\nend tell").arg(subject, att)
+        : QString("tell application \"Mail\"\nactivate\nset m to make new outgoing message with properties {subject:\"%1\", visible:true}\ntell m to make new attachment with properties {file name:POSIX file \"%2\"} at after the last paragraph\nend tell").arg(subject, att);
+    QProcess::startDetached("osascript", {"-e", script});
+    toast(hasOutlook ? "Outlook" : "Mail");
+#elif defined(Q_OS_WIN)
+    const QString ps = QString("$o=New-Object -ComObject Outlook.Application; $m=$o.CreateItem(0); $m.Subject='%1'; $m.Attachments.Add('%2') | Out-Null; $m.Display()").arg(QString(subject).replace("'", "''"), QString(att).replace("'", "''"));
+    QProcess::startDetached("powershell", {"-NoProfile", "-WindowStyle", "Hidden", "-Command", ps});
+    toast("Outlook");
+#else
+    QDesktopServices::openUrl(QUrl("mailto:?subject=" + QUrl::toPercentEncoding(subject) + "&attach=" + QUrl::toPercentEncoding(att)));
+#endif
 }
 void MainWindow::showSettings() {
     auto* dlg = Dialogs::make(this, TXT("settings"), 480);

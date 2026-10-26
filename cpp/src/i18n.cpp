@@ -36,7 +36,7 @@ static QHash<QString, QPair<QString, QString>> table() { // key -> (th, en)
     add("marking", "การประทับบนหน้า", "Page marking"); add("markHeader", "ป้ายหัวกระดาษ", "Header badge"); add("markFooter", "ป้ายท้ายกระดาษ", "Footer badge"); add("markWatermark", "ลายน้ำทแยง", "Diagonal watermark"); add("markEncrypt", "เข้ารหัสไฟล์ด้วย", "Encrypt file too"); add("msipWrite", "เขียน metadata MSIP (Purview)", "Write MSIP (Purview) metadata"); add("siteId", "Tenant ID (ไม่บังคับ)", "Tenant ID (optional)");
     add("labelApplied", "กำหนดชั้นความลับแล้ว", "Classification applied"); add("labelRemoved", "ถอดชั้นความลับแล้ว", "Classification removed"); add("found", "พบ", "found"); add("deleteLabel", "ลบ label นี้", "Delete this label"); add("batch", "ทำหลายไฟล์", "Batch"); add("batchHint", "เลือกหลายไฟล์ → ชั้นความลับเดียวกันทั้งหมด บันทึกลงโฟลเดอร์ที่เลือก", "Pick many files → same classification, saved to a chosen folder"); add("done", "เสร็จ", "done");
     add("filesChecked", "ไฟล์ที่ติ๊ก", "files checked"); add("checkHint", "ติ๊กเพื่อรวม/ทำหลายไฟล์", "Tick for merge / batch"); add("batchHintChecked", "ทำกับไฟล์ที่ติ๊กไว้", "Apply to ticked files");
-    add("home", "หน้าแรก", "Home");
+    add("email", "ส่งอีเมล", "Email"); add("home", "หน้าแรก", "Home"); add("sidebarLeft", "ซ่อน/แสดงแผงซ้าย", "Toggle left sidebar"); add("sidebarRight", "ซ่อน/แสดงแผงขวา", "Toggle right sidebar");
     add("recentFiles", "ไฟล์ล่าสุด", "Recent files"); add("removeRecent", "เอาออกจากรายการล่าสุด", "Remove from recent");
     add("confirmDelete", "ลบหน้าที่เลือก?", "Delete selected pages?"); add("cannotDeleteAll", "ต้องเหลืออย่างน้อย 1 หน้า", "At least one page must remain"); add("rendering", "กำลังแสดงผล…", "Rendering…"); add("search", "ค้นหา", "Search");
     return h;
