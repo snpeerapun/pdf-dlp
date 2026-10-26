@@ -18,7 +18,7 @@ public:
     PageWidget(std::shared_ptr<PdfDoc> d, int index, Viewer* v, QWidget* parent = nullptr);
     void setScale(double s);
     int index() const { return idx; }
-    void invalidate() { imgScale = 0; objs.clear(); update(); }
+    void invalidate() { imgScale = 0; objs.clear(); objsLoaded = false; hover = -1; update(); }
     bool wanted = false; int distance = 0;
     int selected = -1;
 protected:

@@ -76,24 +76,30 @@ QList<EditObject> EditSession::objects(int page) {
     QList<EditObject> out; QList<EditObject> texts;
     for (const EditObject& e : raw) { if (e.type == FPDF_PAGEOBJ_TEXT) texts << e; else out << e; }
     std::sort(texts.begin(), texts.end(), [](const EditObject& a, const EditObject& b) { return a.rect.left() < b.rect.left(); });
-    struct Line { EditObject obj; QList<EditObject> glyphs; };
+    // Each line keeps a "core" band (the box of its base glyphs) and a reference height (effective font size).
+    // Tolerances are derived from the reference height, never from the united box, so a line cannot snowball
+    // into a page-sized blob (seen on dense Chrome PDFs: 500+ glyphs merged into one 480x690 object).
+    struct Line { EditObject obj; QList<EditObject> glyphs; QRectF core; double ref = 0; bool coreIsMark = true; };
     QList<Line> lines;
+    auto refOf = [](const EditObject& g) { return g.fontSize > 1.0f ? double(g.fontSize) : g.rect.height() * 1.3; };
     for (const EditObject& g : texts) {
-        Line* best = nullptr; double bestGap = 1e18;
+        Line* best = nullptr; double bestGap = 1e18; const double gref = refOf(g);
         for (Line& L : lines) {
-            const double hh = std::max(L.obj.rect.height(), g.rect.height());
-            const bool mark = g.rect.height() < hh * 0.4 || g.text.trimmed().isEmpty();                 // combining mark / tiny glyph piece
-            const double overlap = std::min(L.obj.rect.bottom(), g.rect.bottom()) - std::max(L.obj.rect.top(), g.rect.top());
-            if (mark) { if (g.rect.bottom() < L.obj.rect.top() - hh * 0.9 || g.rect.top() > L.obj.rect.bottom() + hh * 0.5) continue; }
-            else if (overlap < std::min(L.obj.rect.height(), g.rect.height()) * 0.4) continue;         // not on the same line
-            if (std::abs(L.obj.fontSize - g.fontSize) > 0.01 + L.obj.fontSize * 0.3) continue;           // different size = different run
+            if (std::abs(L.ref - gref) > 0.01 + L.ref * 0.3) continue;                                    // different size = different run
             if (L.obj.bold != g.bold) continue;                                                             // bold vs regular = different run
+            const double ref = std::max(L.ref, gref);
+            const bool mark = g.rect.height() < ref * 0.4 || g.text.trimmed().isEmpty();                  // combining mark / tiny glyph piece / space
+            if (mark || L.coreIsMark) { if (g.rect.bottom() < L.core.top() - ref * 0.9 || g.rect.top() > L.core.bottom() + ref * 0.5) continue; }
+            else { const double overlap = std::min(L.core.bottom(), g.rect.bottom()) - std::max(L.core.top(), g.rect.top()); if (overlap < std::min(L.core.height(), g.rect.height()) * 0.4) continue; } // not on the same line
             const double gap = g.rect.left() - L.obj.rect.right();
-            if (gap > hh * 1.6 || g.rect.right() < L.obj.rect.left() - hh * 1.6) continue;
+            if (gap > ref * 1.6 || g.rect.right() < L.obj.rect.left() - ref * 1.6) continue;
             if (std::abs(gap) < bestGap) { bestGap = std::abs(gap); best = &L; }
         }
-        if (best) { best->obj.rect = best->obj.rect.united(g.rect); best->obj.members << g.index; best->glyphs << g; }
-        else { Line L; L.obj = g; L.glyphs << g; lines << L; }
+        const bool gmark = g.text.trimmed().isEmpty() || g.rect.height() < gref * 0.4;
+        if (best) {
+            best->obj.rect = best->obj.rect.united(g.rect); best->obj.members << g.index; best->glyphs << g;
+            if (!gmark) { if (best->coreIsMark) { best->core = g.rect; best->coreIsMark = false; } else best->core = best->core.united(g.rect); }
+        } else { Line L; L.obj = g; L.glyphs << g; L.core = g.rect; L.ref = gref; L.coreIsMark = gmark; lines << L; }
     }
     for (Line& L : lines) {
         if (L.glyphs.size() > 1) {

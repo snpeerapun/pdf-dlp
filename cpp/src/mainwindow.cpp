@@ -87,6 +87,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     retranslate(); refreshAll();
     // debug helper for screenshots: PDFDLP_START_TAB=pages[:N] opens the pages tab and selects page N
     if (const QByteArray q = qgetenv("PDFDLP_SEARCH"); !q.isEmpty()) QTimer::singleShot(3000, this, [this, q]() { homeMode = false; searchbar->show(); searchEdit->setText(QString::fromUtf8(q)); runSearch(); });
+    if (qEnvironmentVariableIsSet("PDFDLP_START_EDIT")) QTimer::singleShot(2500, this, [this]() { homeMode = false; enterEdit(); }); // debug: enter edit mode after the file opens
     if (const QByteArray t = qgetenv("PDFDLP_START_TAB"); t.startsWith("pages")) QTimer::singleShot(1500, this, [this, t]() { sidebar->setCurrentIndex(1); const int n = t.contains(':') ? t.mid(t.indexOf(':') + 1).toInt() : 0; if (n > 0) { if (auto* l = sidebar->findChild<QListWidget*>("thumbs")) if (n <= l->count()) l->item(n - 1)->setSelected(true); } });
 }
 

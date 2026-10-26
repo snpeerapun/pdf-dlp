@@ -24,6 +24,8 @@
 - EditSession เปิด FPDF_DOCUMENT แยก + form-fill env · **ห้ามเรียก PDFium เขียน content stream เดิมใหม่** (`FPDFPageObj_Transform`/`RemoveObject` บน object เดิม → `FPDFPage_GenerateContent` เขียน stream ใหม่แล้วตัวหนังสือหายทั้งหน้าใน PDF จาก Chrome/Skia — พิสูจน์ด้วย `--editdebug`)
   ⇒ ย้าย/แก้/ลบ object เดิม = **ปิดทับด้วยกล่องขาว + วาง object ใหม่** (เพิ่มเข้า stream ใหม่เท่านั้น) · ของที่ไม่ได้แตะคงเดิมไบต์ต่อไบต์
 - PDF จาก Chrome แตก text เป็น object ละ 1 glyph + สระ/วรรณยุกต์เป็น object จิ๋วแยก → `objects()` รวมเป็น "บรรทัด" (ซ้อนแนวตั้ง/ช่องว่าง ≤1.6×สูง) และสร้างข้อความบรรทัดจาก glyph ฐาน โดยข้าม mark object ที่ซ้ำ (เช็คทั้งก่อน/หลังใน x-order)
+- บั๊กที่เคยทำให้ "คลิก object ไม่ติด" (แก้ 2026-10-26 เย็น): (1) `PageWidget::invalidate()` ล้าง objs แต่ไม่รีเซ็ต `objsLoaded` → หลังแก้ไขครั้งแรก/เข้า edit รอบสอง รายการว่างถาวร (2) line builder ใช้ความสูงของกล่องรวมเป็นเกณฑ์ → ลูกโซ่กลืน glyph ทั้งหน้าเป็นก้อนเดียว (Plantora pdf: 554 glyphs → 482×686) ⇒ ตอนนี้ใช้ core band + ref = effective font size เท่านั้น
+- debug: `--objdump <pdf> [page]` พิมพ์ object ที่รวมแล้ว · `PDFDLP_START_EDIT=1` เข้าโหมด edit อัตโนมัติ · `PDFDLP_NO_SINGLE=1` เปิด instance ที่สองได้ (ทดสอบคลิกด้วย cliclick โดยไม่แตะแอปที่เจ้าของเปิดอยู่)
 - ข้อความที่วางใหม่ใช้ฟอนต์ฝัง (TTF ใน `assets/fonts/edit`, CID) เสมอ — SetText กับฟอนต์เดิมของเอกสารแปลง charcode ไม่ได้ (เรนเดอร์ว่าง)
 - ช่องฟอร์มใหม่สร้างฝั่ง Rust (`Op::AddField`) หลัง PDFium save · กรอกฟอร์มเดิมผ่าน FORM_On* + FFLDraw
 - debug: `"PDF DLP" --editdebug <pdf> <outdir>` เรนเดอร์ 9 กรณีเทียบ · selftest มีขั้น edit

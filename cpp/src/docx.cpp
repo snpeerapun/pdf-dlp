@@ -52,17 +52,17 @@ QJsonObject extract(const PdfDoc& doc, EditSession* session) {
         if (session) for (const EditObject& e : session->objects(pi)) if (e.type == FPDF_PAGEOBJ_PATH && (e.rect.width() < 3 || e.rect.height() < 3) && (e.rect.width() > 8 || e.rect.height() > 8)) rules << e.rect;
         std::lock_guard<std::mutex> lk(pdfiumLock());
         // ---- rows: lines that overlap vertically (label + value cells on one table row) ----
-        struct Row { QList<Line> cells; QRectF box; double size = 0; };
+        struct Row { QList<Line> cells; QRectF box; QRectF band; double size = 0; }; // band = vertical overlap of all cells (no snowballing)
         QList<Row> rows;
         std::stable_sort(lines.begin(), lines.end(), [](const Line& a, const Line& b) { return a.box.top() < b.box.top(); });
         for (const Line& ln : lines) {
             Row* hit = nullptr;
             for (int k = rows.size() - 1; k >= 0 && k >= rows.size() - 4; k--) {
-                Row& r = rows[k]; const double ov = std::min(r.box.bottom(), ln.box.bottom()) - std::max(r.box.top(), ln.box.top());
-                if (ov >= std::min(r.box.height(), ln.box.height()) * 0.5) { hit = &r; break; }
+                Row& r = rows[k]; const double ov = std::min(r.band.bottom(), ln.box.bottom()) - std::max(r.band.top(), ln.box.top());
+                if (ov >= std::min(r.band.height(), ln.box.height()) * 0.5 && std::abs(ln.size - r.size) < std::max(ln.size, r.size) * 0.6) { hit = &r; break; }
             }
-            if (hit) { hit->cells << ln; hit->box = hit->box.united(ln.box); hit->size = std::max(hit->size, ln.size); }
-            else { Row r; r.cells << ln; r.box = ln.box; r.size = ln.size; rows << r; }
+            if (hit) { hit->cells << ln; hit->box = hit->box.united(ln.box); hit->band = QRectF(hit->band.left(), std::max(hit->band.top(), ln.box.top()), 1, std::min(hit->band.bottom(), ln.box.bottom()) - std::max(hit->band.top(), ln.box.top())); hit->size = std::max(hit->size, ln.size); }
+            else { Row r; r.cells << ln; r.box = ln.box; r.band = ln.box; r.size = ln.size; rows << r; }
         }
         for (Row& r : rows) std::stable_sort(r.cells.begin(), r.cells.end(), [](const Line& a, const Line& b) { return a.box.left() < b.box.left(); });
         // ---- runs for a list of lines (one paragraph / one cell) ----
@@ -102,6 +102,7 @@ QJsonObject extract(const PdfDoc& doc, EditSession* session) {
                     else break;
                 }
             }
+            if (rj > ri && cols.size() > 10) rj = ri; // too many columns = not a real table (fall back to tabbed lines)
             if (rj > ri) {
                 std::sort(cols.begin(), cols.end());
                 QRectF tbox; for (int k = ri; k <= rj; k++) tbox = tbox.isNull() ? rows[k].box : tbox.united(rows[k].box);
