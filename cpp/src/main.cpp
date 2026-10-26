@@ -45,8 +45,9 @@ static int selfTest(const QString& fixture, const QString& outDir) {
         const int before = es.objects(0).size();
         es.addText(0, QPointF(60, 700), QString::fromUtf8("ทดสอบแก้ไข PDF ภาษาไทย"), 16, QColor("#1f2733"), "Sarabun");
         es.addRect(0, QRectF(50, 680, 300, 40), QColor("#e5484d"), 1.5, QColor("#fff3d6"), true); es.addLine(0, QPointF(50, 740), QPointF(350, 740), QColor("#4f8cff"), 2);
-        const int after = es.objects(0).size(); if (after < before + 3) return QString("FAIL objects %1->%2").arg(before).arg(after);
-        es.move(0, after - 3, QPointF(10, 0));
+        const auto objs = es.objects(0); const int after = objs.size(); if (after < before + 2) return QString("FAIL objects %1->%2").arg(before).arg(after);
+        int added = -1; for (const auto& e : objs) if (e.text.contains(QString::fromUtf8("ทดสอบ"))) added = e.index; if (added < 0) return QString("FAIL added text object not found");
+        es.move(0, added, QPointF(10, 0));
         const QString o = outDir + "/selftest-edited.pdf"; if (!es.save(o)) return QString("FAIL save ") + es.error;
         bool n; auto d = PdfDoc::open(o, pw, &n); if (!d) return QString("FAIL reopen");
         const QString txt = d->pageText(0); if (!txt.contains(QString::fromUtf8("ภาษาไทย"))) return QString("FAIL text not found: ") + txt.left(80);
@@ -63,12 +64,14 @@ static int selfTest(const QString& fixture, const QString& outDir) {
 
 static int editDebug(const QString& in, const QString& outDir) {
     QList<QPair<QString, QByteArray>> fonts; QFile f(QCoreApplication::applicationDirPath() + "/../Resources/fonts/edit/Sarabun-Regular.ttf"); f.open(QIODevice::ReadOnly); fonts << qMakePair(QString("Sarabun"), f.readAll());
-    for (const QString mode : {"plain", "gen", "objs-only", "move-only", "move-last", "addtext", "addtext-nogen"}) {
+    for (const QString mode : {"plain", "gen", "objs-only", "move-only", "move-last", "move-text", "move-added", "addtext", "addtext-nogen"}) {
         EditSession es(in, "", fonts); if (!es.ok()) { printf("open fail\n"); return 1; }
         if (mode == "gen") { es.objects(0); es.move(0, 0, QPointF(0, 0)); }
         if (mode == "objs-only") { es.objects(0); es.addLine(0, QPointF(10, 10), QPointF(20, 20), Qt::red, 1); }
         if (mode == "move-only") { es.move(0, 0, QPointF(5, 0)); }
-        if (mode == "move-last") { const auto o = es.objects(0); es.move(0, o.last().index, QPointF(5, 0)); printf("objects=%d first type=%d last type=%d\n", o.size(), o.first().type, o.last().type); }
+        if (mode == "move-text") { const auto o = es.objects(0); fprintf(stderr, "lines=%d\n", o.size()); for (const auto& e : o) if (e.text.contains("CONFIDENTIAL") || e.text.contains(QString::fromUtf8("ห้ามเผยแพร่"))) { fprintf(stderr, "moving '%s' rect=%.0f,%.0f %.0fx%.0f size=%.1f subset=%d\n", qPrintable(e.text), e.rect.x(), e.rect.y(), e.rect.width(), e.rect.height(), e.fontSize, int(e.subsetFont)); es.move(0, e.index, QPointF(0, 60)); break; } }
+        if (mode == "move-added") { es.addText(0, QPointF(60, 400), "ADDED TEXT", 18, QColor("#1b7f44"), "Sarabun"); const auto o = es.objects(0); es.move(0, o.last().index, QPointF(150, 0)); }
+        if (mode == "move-last") { const auto o = es.objects(0); es.move(0, o.last().index, QPointF(5, 0)); printf("objects=%d first type=%d last type=%d\n", o.size(), o.first().type, o.last().type); int shown = 0; for (int k = 0; k < o.size() && shown < 14; k++) if (o[k].type == 1) { printf("  obj %d text=[%s] rect=%.1f,%.1f %.1fx%.1f fs=%.1f subset=%d\n", o[k].index, qPrintable(o[k].text), o[k].rect.x(), o[k].rect.y(), o[k].rect.width(), o[k].rect.height(), o[k].fontSize, int(o[k].subsetFont)); shown++; } }
         if (mode.startsWith("addtext")) es.addText(0, QPointF(60, 300), QString::fromUtf8("ทดสอบ Thai text"), 16, QColor("#c62828"), "Sarabun");
         const QString o = outDir + "/dbg-" + mode + ".pdf"; es.save(o);
         bool n; auto d = PdfDoc::open(o, "", &n); const QString t = d ? d->pageText(0) : "<open fail>";

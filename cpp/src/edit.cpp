@@ -52,25 +52,75 @@ QImage EditSession::render(int page, int widthPx, qreal dpr) {
 }
 QList<EditObject> EditSession::objects(int page) {
     std::lock_guard<std::mutex> l(pdfiumLock());
-    QList<EditObject> out; FPDF_PAGE p = pageHandle(page); if (!p) return out;
+    QList<EditObject> raw; FPDF_PAGE p = pageHandle(page); if (!p) return raw;
     FPDF_TEXTPAGE tp = FPDFText_LoadPage(p);
     const int n = FPDFPage_CountObjects(p);
     for (int i = 0; i < n; i++) {
-        FPDF_PAGEOBJECT o = FPDFPage_GetObject(p, i); EditObject e; e.index = i; e.type = FPDFPageObj_GetType(o);
+        if (hidden.count(page) && hidden[page].count(i)) continue;
+        FPDF_PAGEOBJECT o = FPDFPage_GetObject(p, i); EditObject e; e.index = i; e.type = FPDFPageObj_GetType(o); e.members << i;
         float l = 0, b = 0, r = 0, t = 0; if (!FPDFPageObj_GetBounds(o, &l, &b, &r, &t)) continue;
-        const QPointF a = toViewer(page, l, b), c = toViewer(page, r, t);
-        e.rect = QRectF(a, c).normalized();
+        const QPointF a = toViewer(page, l, b), c2 = toViewer(page, r, t);
+        e.rect = QRectF(a, c2).normalized();
         if (e.type == FPDF_PAGEOBJ_TEXT) {
             const unsigned long len = FPDFTextObj_GetText(o, tp, nullptr, 0);
             if (len > 0) { std::vector<unsigned short> buf(len / 2 + 1); FPDFTextObj_GetText(o, tp, buf.data(), len); e.text = QString::fromUtf16(reinterpret_cast<const char16_t*>(buf.data())); }
             float fs = 0; FPDFTextObj_GetFontSize(o, &fs); e.fontSize = fs;
             if (FPDF_FONT f = FPDFTextObj_GetFont(o)) { char name[128] = {0}; FPDFFont_GetBaseFontName(f, name, sizeof(name)); e.subsetFont = QString(name).contains('+'); }
         }
-        if (e.rect.width() < 0.5 && e.rect.height() < 0.5) continue;
-        if (hidden.count(page) && hidden[page].count(i)) continue;
-        out << e;
+        if (e.rect.width() < 0.3 && e.rect.height() < 0.3) continue;
+        raw << e;
+    }
+    // Merge per-glyph text objects (Chrome/Skia emit one object per glyph, marks as separate tiny objects) into lines.
+    QList<EditObject> out; QList<EditObject> texts;
+    for (const EditObject& e : raw) { if (e.type == FPDF_PAGEOBJ_TEXT) texts << e; else out << e; }
+    std::sort(texts.begin(), texts.end(), [](const EditObject& a, const EditObject& b) { return a.rect.left() < b.rect.left(); });
+    struct Line { EditObject obj; QList<EditObject> glyphs; };
+    QList<Line> lines;
+    for (const EditObject& g : texts) {
+        Line* best = nullptr; double bestGap = 1e18;
+        for (Line& L : lines) {
+            const double hh = std::max(L.obj.rect.height(), g.rect.height());
+            const bool mark = g.rect.height() < hh * 0.4 || g.text.trimmed().isEmpty();                 // combining mark / tiny glyph piece
+            const double overlap = std::min(L.obj.rect.bottom(), g.rect.bottom()) - std::max(L.obj.rect.top(), g.rect.top());
+            if (mark) { if (g.rect.bottom() < L.obj.rect.top() - hh * 0.9 || g.rect.top() > L.obj.rect.bottom() + hh * 0.5) continue; }
+            else if (overlap < std::min(L.obj.rect.height(), g.rect.height()) * 0.4) continue;         // not on the same line
+            if (std::abs(L.obj.fontSize - g.fontSize) > 0.01 + L.obj.fontSize * 0.3) continue;           // different size = different run
+            const double gap = g.rect.left() - L.obj.rect.right();
+            if (gap > hh * 1.6 || g.rect.right() < L.obj.rect.left() - hh * 1.6) continue;
+            if (std::abs(gap) < bestGap) { bestGap = std::abs(gap); best = &L; }
+        }
+        if (best) { best->obj.rect = best->obj.rect.united(g.rect); best->obj.members << g.index; best->glyphs << g; }
+        else { Line L; L.obj = g; L.glyphs << g; lines << L; }
+    }
+    for (Line& L : lines) {
+        if (L.glyphs.size() > 1) {
+            // line text = base glyphs only (combining-mark objects are short and repeat the base text)
+            const double lineH = L.obj.rect.height(); QString t;
+            auto hasMark = [](const QString& x) { for (QChar ch : x) { const ushort u = ch.unicode(); if (u == 0x0E31 || (u >= 0x0E34 && u <= 0x0E3A) || (u >= 0x0E47 && u <= 0x0E4E)) return true; } return false; };
+            for (int gi = 0; gi < L.glyphs.size(); gi++) {
+                const EditObject& g = L.glyphs[gi]; const QString gt = g.text.trimmed();
+                if (gt.isEmpty()) { if (!g.text.isEmpty() && !t.endsWith(' ')) t += ' '; continue; }
+                // a combining-mark object (tiny box) repeats the "base+mark" text of its base glyph (before or after it in x order) → skip it
+                if (g.rect.height() < lineH * 0.45 && hasMark(gt)) {
+                    bool dup = t.endsWith(gt);
+                    for (int k = gi + 1; k <= gi + 2 && k < L.glyphs.size() && !dup; k++) if (L.glyphs[k].text.trimmed() == gt && L.glyphs[k].rect.height() >= lineH * 0.45) dup = true;
+                    if (dup) continue;
+                }
+                t += g.text;
+            }
+            if (t.trimmed().isEmpty() && tp) {
+                const QPointF a = toPage(page, L.obj.rect.topLeft()), b = toPage(page, L.obj.rect.bottomRight());
+                const double left = std::min(a.x(), b.x()) - 0.5, right = std::max(a.x(), b.x()) + 0.5, top = std::max(a.y(), b.y()) + 0.5, bottom = std::min(a.y(), b.y()) - 0.5;
+                const int cnt = FPDFText_GetBoundedText(tp, left, top, right, bottom, nullptr, 0);
+                if (cnt > 0) { std::vector<unsigned short> buf(cnt + 1); FPDFText_GetBoundedText(tp, left, top, right, bottom, buf.data(), cnt); t = QString::fromUtf16(reinterpret_cast<const char16_t*>(buf.data()), cnt); }
+            }
+            L.obj.text = t.trimmed();
+            std::sort(L.obj.members.begin(), L.obj.members.end());
+        }
+        out << L.obj;
     }
     if (tp) FPDFText_ClosePage(tp);
+    std::sort(out.begin(), out.end(), [](const EditObject& a, const EditObject& b) { return a.index < b.index; });
     return out;
 }
 EditObject EditSession::objectAt(int page, QPointF v) {
@@ -94,8 +144,11 @@ void EditSession::move(int page, int index, QPointF d) {
     const QPointF a = toPage(page, QPointF(0, 0)), b = toPage(page, d); const double dx = b.x() - a.x(), dy = b.y() - a.y();
     FPDF_PAGEOBJECT n = nullptr;
     if (e.type == FPDF_PAGEOBJ_TEXT) {
-        float fs = 12; FPDFTextObj_GetFontSize(o, &fs); FS_MATRIX m{}; FPDFPageObj_GetMatrix(o, &m); unsigned int R = 0, G = 0, B = 0, A = 255; FPDFPageObj_GetFillColor(o, &R, &G, &B, &A);
-        FPDF_FONT f = (!e.subsetFont && asciiOnly(e.text)) ? FPDFTextObj_GetFont(o) : fontFor(QString()); if (!f) return;
+        // leftmost glyph carries the line origin; always re-typeset with an embedded font (original CID fonts cannot be re-encoded reliably)
+        int first = e.members.first(); double fx = 1e18; for (int mi : e.members) { FPDF_PAGEOBJECT g = FPDFPage_GetObject(p, mi); float l2, b2, r2, t2; if (g && FPDFPageObj_GetBounds(g, &l2, &b2, &r2, &t2) && l2 < fx) { fx = l2; first = mi; } }
+        FPDF_PAGEOBJECT fo = FPDFPage_GetObject(p, first);
+        float fs = 12; FPDFTextObj_GetFontSize(fo, &fs); FS_MATRIX m{}; FPDFPageObj_GetMatrix(fo, &m); unsigned int R = 0, G = 0, B = 0, A = 255; FPDFPageObj_GetFillColor(fo, &R, &G, &B, &A);
+        FPDF_FONT f = fontFor(QString()); if (!f) return;
         n = FPDFPageObj_CreateTextObj(doc, f, fs); const std::u16string w = e.text.toStdU16String(); FPDFText_SetText(n, reinterpret_cast<FPDF_WIDESTRING>(w.c_str()));
         m.e += float(dx); m.f += float(dy); FPDFPageObj_SetMatrix(n, &m); FPDFPageObj_SetFillColor(n, R, G, B, A);
     } else if (e.type == FPDF_PAGEOBJ_IMAGE) {
@@ -103,14 +156,14 @@ void EditSession::move(int page, int index, QPointF d) {
         FS_MATRIX m{}; FPDFPageObj_GetMatrix(o, &m); n = FPDFPageObj_NewImageObj(doc); FPDF_PAGE pages[1] = {p}; FPDFImageObj_SetBitmap(pages, 1, n, bmp); FPDFBitmap_Destroy(bmp);
         m.e += float(dx); m.f += float(dy); FPDFPageObj_SetMatrix(n, &m);
     } else { lastNote = "paths"; return; }
-    whiteout(page, e.rect); hidden[page].insert(index);
+    whiteout(page, e.rect); for (int mi : e.members) hidden[page].insert(mi);
     FPDFPage_InsertObject(p, n); FPDFPage_GenerateContent(p); dirty = true; dirtyPages.insert(page);
 }
 void EditSession::remove(int page, int index) {
     const EditObject e = findObj(objects(page), index); if (e.index < 0) return;
     std::lock_guard<std::mutex> l(pdfiumLock());
     FPDF_PAGE p = pageHandle(page); if (!p) return;
-    whiteout(page, e.rect); hidden[page].insert(index);
+    whiteout(page, e.rect); for (int mi : e.members) hidden[page].insert(mi);
     FPDFPage_GenerateContent(p); dirty = true; dirtyPages.insert(page);
 }
 FPDF_FONT EditSession::fontFor(const QString& name) {
@@ -125,13 +178,15 @@ FPDF_FONT EditSession::fontFor(const QString& name) {
 bool EditSession::setText(int page, int index, const QString& text, const QString& fontName) {
     const EditObject e = findObj(objects(page), index); if (e.index < 0 || e.type != FPDF_PAGEOBJ_TEXT) return false;
     std::lock_guard<std::mutex> l(pdfiumLock());
-    FPDF_PAGE p = pageHandle(page); FPDF_PAGEOBJECT o = FPDFPage_GetObject(p, index); if (!o) return false;
+    FPDF_PAGE p = pageHandle(page); if (!p) return false;
+    int first = e.members.first(); double fx = 1e18; for (int mi : e.members) { FPDF_PAGEOBJECT g = FPDFPage_GetObject(p, mi); float l2, b2, r2, t2; if (g && FPDFPageObj_GetBounds(g, &l2, &b2, &r2, &t2) && l2 < fx) { fx = l2; first = mi; } }
+    FPDF_PAGEOBJECT o = FPDFPage_GetObject(p, first); if (!o) return false;
     float fs = 12; FPDFTextObj_GetFontSize(o, &fs); FS_MATRIX m{}; FPDFPageObj_GetMatrix(o, &m); unsigned int R = 0, G = 0, B = 0, A = 255; FPDFPageObj_GetFillColor(o, &R, &G, &B, &A);
-    FPDF_FONT f = (!e.subsetFont && asciiOnly(text) && fontName.isEmpty()) ? FPDFTextObj_GetFont(o) : fontFor(fontName); if (!f) return false;
+    FPDF_FONT f = fontFor(fontName); if (!f) return false;
     FPDF_PAGEOBJECT n = FPDFPageObj_CreateTextObj(doc, f, fs); if (!n) return false;
     const std::u16string w = text.toStdU16String(); FPDFText_SetText(n, reinterpret_cast<FPDF_WIDESTRING>(w.c_str()));
     FPDFPageObj_SetMatrix(n, &m); FPDFPageObj_SetFillColor(n, R, G, B, A);
-    whiteout(page, e.rect); hidden[page].insert(index);
+    whiteout(page, e.rect); for (int mi : e.members) hidden[page].insert(mi);
     FPDFPage_InsertObject(p, n); FPDFPage_GenerateContent(p); dirty = true; dirtyPages.insert(page); return true;
 }
 void EditSession::addText(int page, QPointF v, const QString& text, double fontSize, const QColor& color, const QString& fontName) {

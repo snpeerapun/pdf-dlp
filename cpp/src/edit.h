@@ -8,7 +8,7 @@
 #include <fpdf_text.h>
 #include <map>
 
-struct EditObject { int index = -1; int type = 0; QRectF rect; QString text; float fontSize = 0; bool subsetFont = false; };
+struct EditObject { int index = -1; int type = 0; QRectF rect; QString text; float fontSize = 0; bool subsetFont = false; QList<int> members; /* glyph objects merged into this line */ };
 
 class EditSession {
 public:
