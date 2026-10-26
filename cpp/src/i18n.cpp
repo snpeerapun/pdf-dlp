@@ -42,6 +42,7 @@ static QHash<QString, QPair<QString, QString>> table() { // key -> (th, en)
     add("strokeWidth", "ความหนาเส้น", "Stroke width"); add("fill", "พื้น", "Fill"); add("fillColor", "สีพื้น", "Fill color"); add("deleteObject", "ลบ", "Delete"); add("cancelEdit", "ยกเลิก", "Cancel"); add("finishEdit", "เสร็จ (บันทึกการแก้ไข)", "Done"); add("editSaved", "บันทึกการแก้ไขแล้ว (ต้นฉบับยังไม่ถูกทับจนกว่าจะบันทึกเป็น)", "Edits applied (original untouched until Save as)"); add("fieldName", "ชื่อฟิลด์", "Field name"); add("home", "หน้าแรก", "Home"); add("sidebarLeft", "ซ่อน/แสดงแผงซ้าย", "Toggle left sidebar"); add("sidebarRight", "ซ่อน/แสดงแผงขวา", "Toggle right sidebar");
     add("recentFiles", "ไฟล์ล่าสุด", "Recent files"); add("pinnedFiles", "ไฟล์ที่ปักหมุด", "Pinned files"); add("pin", "ปักหมุด", "Pin"); add("unpin", "เลิกปักหมุด", "Unpin"); add("removeRecent", "เอาออกจากรายการล่าสุด", "Remove from recent");
     add("confirmDelete", "ลบหน้าที่เลือก?", "Delete selected pages?"); add("cannotDeleteAll", "ต้องเหลืออย่างน้อย 1 หน้า", "At least one page must remain"); add("rendering", "กำลังแสดงผล…", "Rendering…"); add("search", "ค้นหา", "Search");
+    add("autoDetected", "ตรวจหา label จาก MS DLP อัตโนมัติแล้ว", "Auto-detected labels from MS DLP");
     return h;
 }
 namespace I18n {
